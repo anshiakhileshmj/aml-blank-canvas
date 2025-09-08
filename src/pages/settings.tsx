@@ -30,7 +30,7 @@ export default function Settings() {
     alert_types: ['high_risk', 'sanctions', 'api_limit'],
     email_notifications: true,
     push_notifications: false,
-    webhook_url: null
+    webhook_url: null as string | null
   });
 
   const [profile, setProfile] = useState({
@@ -56,7 +56,12 @@ export default function Settings() {
           setSettings(userSettings);
         }
         if (notifSettings) {
-          setNotificationSettings(notifSettings);
+          setNotificationSettings({
+            alert_types: notifSettings.alert_types || ['high_risk', 'sanctions', 'api_limit'],
+            email_notifications: notifSettings.email_notifications ?? true,
+            push_notifications: notifSettings.push_notifications ?? false,
+            webhook_url: notifSettings.webhook_url || null,
+          });
         }
       } catch (error) {
         console.error('Error loading settings:', error);
@@ -386,7 +391,7 @@ export default function Settings() {
                   value={notificationSettings.webhook_url || ''}
                   onChange={(e) => setNotificationSettings({
                     ...notificationSettings,
-                    webhook_url: e.target.value
+                    webhook_url: e.target.value || null
                   })}
                   placeholder="https://your-domain.com/webhook"
                 />

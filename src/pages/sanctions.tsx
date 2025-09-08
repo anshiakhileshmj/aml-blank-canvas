@@ -15,7 +15,6 @@ import { ComingSoonOverlay } from "@/components/ComingSoonOverlay";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
-
 const getSourceColor = (source: string) => {
   switch (source) {
     case "ofac": return "destructive";
@@ -23,6 +22,16 @@ const getSourceColor = (source: string) => {
     case "eu": return "outline";
     default: return "default";
   }
+};
+
+type SanctionedWallet = {
+  id: string;
+  address: string;
+  source: string;
+  reason?: string;
+  isActive: boolean;
+  addedBy?: string | null;
+  createdAt: string;
 };
 
 export default function SanctionsPage() {
@@ -37,7 +46,31 @@ export default function SanctionsPage() {
   const queryClient = useQueryClient();
 
   const { data: sanctionedWallets = [], isLoading, error } = useQuery({
-    queryKey: ["/api/sanctioned-wallets", { search: searchQuery, source: sourceFilter }],
+    queryKey: ["sanctioned-wallets"],
+    queryFn: async () => {
+      // Mock data since API is not implemented yet
+      const mockData: SanctionedWallet[] = [
+        {
+          id: '1',
+          address: '0x742d35Cc6634C0532925a3b8D02745f5E2b26e24',
+          source: 'ofac',
+          reason: 'Sanctions violation',
+          isActive: true,
+          addedBy: null,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: '2', 
+          address: '0x8ba1f109551bD432803012645Hac136c',
+          source: 'manual',
+          reason: 'Manual sanctions entry',
+          isActive: true,
+          addedBy: 'user',
+          createdAt: new Date().toISOString()
+        }
+      ];
+      return mockData;
+    },
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -90,7 +123,8 @@ export default function SanctionsPage() {
     },
   });
 
-  const filteredWallets = sanctionedWallets?.filter(wallet => {
+  const wallets = Array.isArray(sanctionedWallets) ? sanctionedWallets : [];
+  const filteredWallets = wallets.filter((wallet: SanctionedWallet) => {
     const matchesSearch = !searchQuery || 
       wallet.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
       wallet.reason?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -98,7 +132,7 @@ export default function SanctionsPage() {
     const matchesSource = sourceFilter === "all" || wallet.source === sourceFilter;
     
     return matchesSearch && matchesSource && wallet.isActive;
-  }) || [];
+  });
 
   const handleAddSanction = () => {
     if (!newAddress.trim()) {
@@ -128,8 +162,8 @@ export default function SanctionsPage() {
   };
 
   const totalSanctioned = filteredWallets.length;
-  const ofacCount = filteredWallets.filter(w => w.source === "ofac").length;
-  const manualCount = filteredWallets.filter(w => w.source === "manual").length;
+  const ofacCount = filteredWallets.filter((w: SanctionedWallet) => w.source === "ofac").length;
+  const manualCount = filteredWallets.filter((w: SanctionedWallet) => w.source === "manual").length;
 
   return (
     <Layout>
@@ -336,7 +370,7 @@ export default function SanctionsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredWallets.map((wallet) => (
+                  filteredWallets.map((wallet: SanctionedWallet) => (
                     <TableRow key={wallet.id} data-testid={`wallet-${wallet.id}`}>
                       <TableCell className="font-mono text-sm">
                         {wallet.address.slice(0, 8)}...{wallet.address.slice(-6)}

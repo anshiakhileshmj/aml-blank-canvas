@@ -514,6 +514,63 @@ export type Database = {
         }
         Relationships: []
       }
+      transactions: {
+        Row: {
+          amount: number | null
+          blockchain: string | null
+          created_at: string | null
+          currency: string | null
+          customer_id: string | null
+          customer_name: string | null
+          description: string | null
+          from_address: string
+          id: string
+          risk_level: string | null
+          risk_score: number | null
+          status: string
+          to_address: string
+          tx_hash: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount?: number | null
+          blockchain?: string | null
+          created_at?: string | null
+          currency?: string | null
+          customer_id?: string | null
+          customer_name?: string | null
+          description?: string | null
+          from_address: string
+          id?: string
+          risk_level?: string | null
+          risk_score?: number | null
+          status?: string
+          to_address: string
+          tx_hash?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number | null
+          blockchain?: string | null
+          created_at?: string | null
+          currency?: string | null
+          customer_id?: string | null
+          customer_name?: string | null
+          description?: string | null
+          from_address?: string
+          id?: string
+          risk_level?: string | null
+          risk_score?: number | null
+          status?: string
+          to_address?: string
+          tx_hash?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_settings: {
         Row: {
           api_preferences: Json | null
