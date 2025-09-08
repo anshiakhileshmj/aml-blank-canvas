@@ -124,61 +124,6 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* User Profile Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <User className="w-5 h-5 mr-2" />
-              Profile Information
-            </CardTitle>
-            <CardDescription>Update your personal information</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
-                <Input
-                  value={profile.firstName}
-                  onChange={(e) => setProfile({...profile, firstName: e.target.value})}
-                  placeholder="Enter your first name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input
-                  value={profile.lastName}
-                  onChange={(e) => setProfile({...profile, lastName: e.target.value})}
-                  placeholder="Enter your last name"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                value={profile.email}
-                disabled
-                placeholder="Email from authentication"
-                type="email"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="company">Company</Label>
-              <Input
-                value={profile.company}
-                onChange={(e) => setProfile({...profile, company: e.target.value})}
-                placeholder="Enter your company name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
-              <Input
-                value={profile.role}
-                onChange={(e) => setProfile({...profile, role: e.target.value})}
-                placeholder="Enter your role"
-              />
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Notifications Section */}
         <Card>
