@@ -1,1 +1,4 @@
-project_id = "ddvrucciglfqwwueabdy"
+project_id = "yfwbsjokktasumghrznk"
+
+[functions.relay-webhook]
+verify_jwt = false

@@ -1,28 +1,11 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-relay-key',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
 }
 
-interface RelayTransactionData {
-  from_address: string;
-  to_address: string;
-  amount?: number;
-  currency?: string;
-  blockchain?: string;
-  tx_hash?: string;
-  status: 'approved' | 'rejected' | 'pending';
-  risk_level?: string;
-  risk_score?: number;
-  customer_name?: string;
-  customer_id?: string;
-  description?: string;
-  partner_id?: string;
-  api_key_hash?: string;
-}
-
-Deno.serve(async (req: Request) => {
+serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -39,53 +22,43 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Verify the relay API key
-    const relayKey = req.headers.get('x-relay-key');
-    const expectedRelayKey = Deno.env.get('RELAY_API_SECRET');
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    if (!relayKey || relayKey !== expectedRelayKey) {
-      console.error('Unauthorized relay request - invalid key');
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { 
-          status: 401, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    const transactionData: RelayTransactionData = await req.json();
+    const transactionData = await req.json();
     console.log('Received transaction data:', transactionData);
 
     // Find the user associated with this API key or partner ID
-    let userId: string | null = null;
+    let userId = null;
 
     if (transactionData.api_key_hash) {
       // Look up user by API key hash
-      const { data: apiKey } = await supabase
-        .from('api_keys')
-        .select('user_id')
-        .eq('key_hash', transactionData.api_key_hash)
-        .single();
-
-      if (apiKey) {
-        userId = apiKey.user_id;
+      const response = await fetch(`${supabaseUrl}/rest/v1/api_keys?key_hash=eq.${transactionData.api_key_hash}&select=user_id`, {
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const apiKeys = await response.json();
+      if (apiKeys && apiKeys.length > 0) {
+        userId = apiKeys[0].user_id;
       }
     } else if (transactionData.partner_id) {
       // Look up user by partner ID
-      const { data: profile } = await supabase
-        .from('developer_profiles')
-        .select('user_id')
-        .eq('partner_id', transactionData.partner_id)
-        .single();
+      const response = await fetch(`${supabaseUrl}/rest/v1/developer_profiles?partner_id=eq.${transactionData.partner_id}&select=user_id`, {
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-      if (profile) {
-        userId = profile.user_id;
+      const profiles = await response.json();
+      if (profiles && profiles.length > 0) {
+        userId = profiles[0].user_id;
       }
     }
 
@@ -124,16 +97,22 @@ Deno.serve(async (req: Request) => {
     console.log('Mapped transaction:', mappedTransaction);
 
     // Insert the transaction
-    const { data: insertedTransaction, error: insertError } = await supabase
-      .from('transactions')
-      .insert(mappedTransaction)
-      .select()
-      .single();
+    const insertResponse = await fetch(`${supabaseUrl}/rest/v1/transactions`, {
+      method: 'POST',
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(mappedTransaction)
+    });
 
-    if (insertError) {
-      console.error('Error inserting transaction:', insertError);
+    if (!insertResponse.ok) {
+      const errorData = await insertResponse.json();
+      console.error('Error inserting transaction:', errorData);
       return new Response(
-        JSON.stringify({ error: 'Failed to insert transaction', details: insertError.message }),
+        JSON.stringify({ error: 'Failed to insert transaction', details: errorData }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -141,13 +120,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log('Successfully inserted transaction:', insertedTransaction.id);
+    const insertedTransaction = await insertResponse.json();
+    console.log('Successfully inserted transaction:', insertedTransaction[0]?.id);
 
     // Return success response
     return new Response(
       JSON.stringify({ 
         success: true, 
-        transaction_id: insertedTransaction.id,
+        transaction_id: insertedTransaction[0]?.id,
         message: 'Transaction logged successfully'
       }),
       { 
@@ -159,7 +139,7 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     console.error('Error processing relay transaction:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: (error as Error).message }),
+      JSON.stringify({ error: 'Internal server error', details: error.message }),
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

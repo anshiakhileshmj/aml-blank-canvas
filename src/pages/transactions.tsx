@@ -46,20 +46,20 @@ export default function TransactionsPage() {
   type Transaction = {
     id: string;
     user_id: string;
-    tx_hash?: string;
+    tx_hash?: string | null;
     from_address: string;
     to_address: string;
-    amount?: string;
-    currency?: string;
-    blockchain?: string;
+    amount?: number | null;
+    currency?: string | null;
+    blockchain?: string | null;
     status: string;
-    risk_score?: number;
-    risk_level?: string;
-    customer_name?: string;
-    customer_id?: string;
-    description?: string;
-    created_at: string;
-    updated_at: string;
+    risk_score?: number | null;
+    risk_level?: string | null;
+    customer_name?: string | null;
+    customer_id?: string | null;
+    description?: string | null;
+    created_at: string | null;
+    updated_at: string | null;
   };
 
   const { user } = useAuth();
@@ -68,47 +68,18 @@ export default function TransactionsPage() {
     queryFn: async () => {
       if (!user) return [];
       
-      // Use mock data for now since the table was just created
-      const mockTransactions: Transaction[] = [
-        {
-          id: '1',
-          user_id: user.id,
-          tx_hash: '0x1234567890abcdef',
-          from_address: '0x742d35Cc6634C0532925a3b8D02745f5E2b26e24',
-          to_address: '0x8ba1f109551bD432803012645Hac136c',
-          amount: '1.5',
-          currency: 'ETH',
-          blockchain: 'ethereum',
-          status: 'completed',
-          risk_score: 25,
-          risk_level: 'low',
-          customer_name: 'John Doe',
-          customer_id: 'CUST001',
-          description: 'Regular transfer',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          user_id: user.id,
-          tx_hash: '0xabcdef1234567890',
-          from_address: '0x8ba1f109551bD432803012645Hac136c',
-          to_address: '0x742d35Cc6634C0532925a3b8D02745f5E2b26e24',
-          amount: '0.8',
-          currency: 'ETH',
-          blockchain: 'ethereum',
-          status: 'flagged',
-          risk_score: 85,
-          risk_level: 'high',
-          customer_name: 'Jane Smith',
-          customer_id: 'CUST002',
-          description: 'High-risk transaction',
-          created_at: new Date(Date.now() - 86400000).toISOString(),
-          updated_at: new Date(Date.now() - 86400000).toISOString(),
-        }
-      ];
-      
-      return mockTransactions;
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching transactions:', error);
+        throw error;
+      }
+
+      return data || [];
     },
     enabled: !!user,
     retry: false,
@@ -134,7 +105,7 @@ export default function TransactionsPage() {
     return matchesSearch && matchesStatus && matchesRisk;
   }) || [];
 
-  const totalAmount = filteredTransactions.reduce((sum: number, tx: Transaction) => sum + parseFloat(tx.amount || '0'), 0);
+  const totalAmount = filteredTransactions.reduce((sum: number, tx: Transaction) => sum + (tx.amount || 0), 0);
   const flaggedCount = filteredTransactions.filter((tx: Transaction) => tx.status === "flagged").length;
 
   return (
@@ -303,7 +274,7 @@ export default function TransactionsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="font-medium">
-                        {transaction.amount ? `${parseFloat(transaction.amount).toLocaleString()} ${transaction.currency || 'ETH'}` : 'N/A'}
+                        {transaction.amount ? `${transaction.amount.toLocaleString()} ${transaction.currency || 'ETH'}` : 'N/A'}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">{transaction.blockchain || 'ethereum'}</Badge>
@@ -328,8 +299,8 @@ export default function TransactionsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
-                          <span className="text-sm">{new Date(transaction.created_at).toLocaleDateString()}</span>
-                          <span className="text-xs text-muted-foreground">{new Date(transaction.created_at).toLocaleTimeString()}</span>
+                          <span className="text-sm">{transaction.created_at ? new Date(transaction.created_at).toLocaleDateString() : 'N/A'}</span>
+                          <span className="text-xs text-muted-foreground">{transaction.created_at ? new Date(transaction.created_at).toLocaleTimeString() : 'N/A'}</span>
                         </div>
                       </TableCell>
                       <TableCell>
