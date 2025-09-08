@@ -4,14 +4,14 @@ export interface SubscriptionUsage {
   id?: string;
   user_id?: string;
   plan_type: string;
-  api_calls_used: number | null;
-  api_calls_limit: number | null;
+  api_calls_used: number;
+  api_calls_limit: number;
   billing_period_start: string;
   billing_period_end: string;
-  overage_charges: number | null;
+  overage_charges: number;
 }
 
-export async function getCurrentSubscriptionUsage(): Promise<SubscriptionUsage | null> {
+export async function getCurrentSubscriptionUsage(): Promise<SubscriptionUsage> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
@@ -65,7 +65,7 @@ export async function getCurrentSubscriptionUsage(): Promise<SubscriptionUsage |
   };
 }
 
-export async function getBillingHistory() {
+export async function getBillingHistory(): Promise<SubscriptionUsage[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
@@ -76,7 +76,13 @@ export async function getBillingHistory() {
     .order('billing_period_start', { ascending: false });
 
   if (error) throw error;
-  return data || [];
+  
+  return (data || []).map(item => ({
+    ...item,
+    api_calls_used: item.api_calls_used || 0,
+    api_calls_limit: item.api_calls_limit || 1000,
+    overage_charges: item.overage_charges || 0
+  }));
 }
 
 export const PLAN_FEATURES = {
