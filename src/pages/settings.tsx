@@ -1,300 +1,406 @@
-import { useState } from "react";
-import { Settings, Bell, Shield, Globe, Save } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Layout } from "@/components/layout/Layout";
+import { Badge } from "@/components/ui/badge";
+import { Bell, Shield, User, Palette, Zap, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { getUserSettings, updateUserSettings, getNotificationSettings, updateNotificationSettings, UserSettings } from "@/lib/settingsUtils";
 
-export default function SettingsPage() {
-  const [settings, setSettings] = useState({
-    // Notification Settings
-    emailAlerts: true,
-    smsAlerts: false,
-    pushNotifications: true,
-    alertThreshold: "high",
-    
-    // Security Settings
-    twoFactorAuth: false,
-    ipWhitelist: "",
-    sessionTimeout: "24",
-    
-    // API Settings
-    rateLimit: "1000",
-    webhookUrl: "",
-    retryAttempts: "3",
-    
-    // Compliance Settings
-    autoReporting: true,
-    pepMonitoring: true,
-    sanctionsUpdates: true,
-    riskThreshold: "70",
-    
+export default function Settings() {
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  
+  const [settings, setSettings] = useState<UserSettings>({
+    notification_preferences: { email: true, push: false, alerts: true },
+    security_settings: { twoFactorEnabled: false, sessionTimeout: 30 },
+    display_preferences: { theme: 'system', language: 'en' },
+    api_preferences: { defaultRateLimit: 60, webhooksEnabled: false }
   });
 
-  const { toast } = useToast();
+  const [notificationSettings, setNotificationSettings] = useState({
+    alert_types: ['high_risk', 'sanctions', 'api_limit'],
+    email_notifications: true,
+    push_notifications: false,
+    webhook_url: null
+  });
 
-  const handleSettingChange = (key: string, value: any) => {
-    setSettings(prev => ({
-      ...prev,
-      [key]: value
-    }));
+  const [profile, setProfile] = useState({
+    firstName: '',
+    lastName: '',
+    email: user?.email || '',
+    company: '',
+    role: ''
+  });
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      if (!user) return;
+      
+      try {
+        setLoading(true);
+        const [userSettings, notifSettings] = await Promise.all([
+          getUserSettings(),
+          getNotificationSettings()
+        ]);
+        
+        if (userSettings) {
+          setSettings(userSettings);
+        }
+        if (notifSettings) {
+          setNotificationSettings(notifSettings);
+        }
+      } catch (error) {
+        console.error('Error loading settings:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load settings. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSettings();
+  }, [user, toast]);
+
+  const handleSaveSettings = async () => {
+    try {
+      setSaving(true);
+      await Promise.all([
+        updateUserSettings(settings),
+        updateNotificationSettings(notificationSettings)
+      ]);
+      
+      toast({
+        title: "Settings saved",
+        description: "Your settings have been updated successfully.",
+      });
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save settings. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleSaveSettings = () => {
-    // Simulate API call
-    toast({
-      title: "Settings Saved",
-      description: "Your preferences have been updated successfully.",
-    });
-  };
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-            <p className="text-muted-foreground">Configure your AML dashboard preferences</p>
+            <p className="text-muted-foreground">
+              Manage your account settings and preferences
+            </p>
           </div>
-          <Button onClick={handleSaveSettings} data-testid="button-save-settings">
-            <Save className="w-4 h-4 mr-2" />
-            Save Changes
-          </Button>
         </div>
 
-        {/* Notification Settings */}
+        {/* User Profile Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <User className="w-5 h-5 mr-2" />
+              Profile Information
+            </CardTitle>
+            <CardDescription>Update your personal information</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input
+                  value={profile.firstName}
+                  onChange={(e) => setProfile({...profile, firstName: e.target.value})}
+                  placeholder="Enter your first name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  value={profile.lastName}
+                  onChange={(e) => setProfile({...profile, lastName: e.target.value})}
+                  placeholder="Enter your last name"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                value={profile.email}
+                disabled
+                placeholder="Email from authentication"
+                type="email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="company">Company</Label>
+              <Input
+                value={profile.company}
+                onChange={(e) => setProfile({...profile, company: e.target.value})}
+                placeholder="Enter your company name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="role">Role</Label>
+              <Input
+                value={profile.role}
+                onChange={(e) => setProfile({...profile, role: e.target.value})}
+                placeholder="Enter your role"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Notifications Section */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
               <Bell className="w-5 h-5 mr-2" />
-              Notification Settings
+              Notifications
             </CardTitle>
-            <CardDescription>Configure how you receive alerts and notifications</CardDescription>
+            <CardDescription>Configure how you receive alerts</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="email-alerts">Email Alerts</Label>
-                <p className="text-sm text-muted-foreground">Receive alerts via email</p>
+              <div className="space-y-1">
+                <Label>Email Notifications</Label>
+                <p className="text-sm text-muted-foreground">Receive notifications via email</p>
               </div>
               <Switch
-                id="email-alerts"
-                checked={settings.emailAlerts}
-                onCheckedChange={(checked) => handleSettingChange("emailAlerts", checked)}
-                data-testid="switch-email-alerts"
+                checked={notificationSettings.email_notifications}
+                onCheckedChange={(checked) => 
+                  setNotificationSettings({...notificationSettings, email_notifications: checked})
+                }
               />
             </div>
             <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="sms-alerts">SMS Alerts</Label>
-                <p className="text-sm text-muted-foreground">Receive critical alerts via SMS</p>
+              <div className="space-y-1">
+                <Label>Push Notifications</Label>
+                <p className="text-sm text-muted-foreground">Receive push notifications</p>
               </div>
               <Switch
-                id="sms-alerts"
-                checked={settings.smsAlerts}
-                onCheckedChange={(checked) => handleSettingChange("smsAlerts", checked)}
-                data-testid="switch-sms-alerts"
+                checked={notificationSettings.push_notifications}
+                onCheckedChange={(checked) => 
+                  setNotificationSettings({...notificationSettings, push_notifications: checked})
+                }
               />
             </div>
+            <div className="space-y-2">
+              <Label>Alert Types</Label>
+              <div className="flex flex-wrap gap-2">
+                {["high_risk", "sanctions", "api_limit", "compliance"].map((type) => (
+                  <Badge 
+                    key={type}
+                    variant={notificationSettings.alert_types?.includes(type) ? "default" : "outline"}
+                    className="cursor-pointer"
+                    onClick={() => {
+                      const newTypes = notificationSettings.alert_types?.includes(type)
+                        ? notificationSettings.alert_types.filter(t => t !== type)
+                        : [...(notificationSettings.alert_types || []), type];
+                      setNotificationSettings({...notificationSettings, alert_types: newTypes});
+                    }}
+                  >
+                    {type.replace('_', ' ')}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Security Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Shield className="w-5 h-5 mr-2" />
+              Security
+            </CardTitle>
+            <CardDescription>Manage your security preferences</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="push-notifications">Push Notifications</Label>
-                <p className="text-sm text-muted-foreground">Browser push notifications</p>
+              <div className="space-y-1">
+                <Label>Two-Factor Authentication</Label>
+                <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
               </div>
               <Switch
-                id="push-notifications"
-                checked={settings.pushNotifications}
-                onCheckedChange={(checked) => handleSettingChange("pushNotifications", checked)}
-                data-testid="switch-push-notifications"
+                checked={settings.security_settings.twoFactorEnabled}
+                onCheckedChange={(checked) => 
+                  setSettings({
+                    ...settings, 
+                    security_settings: {
+                      ...settings.security_settings,
+                      twoFactorEnabled: checked
+                    }
+                  })
+                }
               />
             </div>
-            <div>
-              <Label htmlFor="alert-threshold">Alert Threshold</Label>
-              <Select value={settings.alertThreshold} onValueChange={(value) => handleSettingChange("alertThreshold", value)}>
-                <SelectTrigger data-testid="select-alert-threshold">
-                  <SelectValue />
+            <div className="space-y-2">
+              <Label>Session Timeout (minutes)</Label>
+              <Input
+                type="number"
+                value={settings.security_settings.sessionTimeout}
+                onChange={(e) => setSettings({
+                  ...settings,
+                  security_settings: {
+                    ...settings.security_settings,
+                    sessionTimeout: parseInt(e.target.value) || 30
+                  }
+                })}
+                placeholder="30"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Display Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Palette className="w-5 h-5 mr-2" />
+              Display
+            </CardTitle>
+            <CardDescription>Customize your interface</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Theme</Label>
+              <Select 
+                value={settings.display_preferences.theme} 
+                onValueChange={(value) => setSettings({
+                  ...settings, 
+                  display_preferences: {
+                    ...settings.display_preferences,
+                    theme: value
+                  }
+                })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select theme" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Alerts</SelectItem>
-                  <SelectItem value="medium">Medium & High</SelectItem>
-                  <SelectItem value="high">High & Critical</SelectItem>
-                  <SelectItem value="critical">Critical Only</SelectItem>
+                  <SelectItem value="light">Light</SelectItem>
+                  <SelectItem value="dark">Dark</SelectItem>
+                  <SelectItem value="system">System</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Language</Label>
+              <Select 
+                value={settings.display_preferences.language} 
+                onValueChange={(value) => setSettings({
+                  ...settings,
+                  display_preferences: {
+                    ...settings.display_preferences,
+                    language: value
+                  }
+                })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select language" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="es">Spanish</SelectItem>
+                  <SelectItem value="fr">French</SelectItem>
+                  <SelectItem value="de">German</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </CardContent>
         </Card>
 
-        {/* Security Settings */}
+        {/* API Settings Section */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
-              <Shield className="w-5 h-5 mr-2" />
-              Security Settings
-            </CardTitle>
-            <CardDescription>Manage account security and access controls</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="two-factor">Two-Factor Authentication</Label>
-                <p className="text-sm text-muted-foreground">Add extra security to your account</p>
-              </div>
-              <Switch
-                id="two-factor"
-                checked={settings.twoFactorAuth}
-                onCheckedChange={(checked) => handleSettingChange("twoFactorAuth", checked)}
-                data-testid="switch-two-factor"
-              />
-            </div>
-            <div>
-              <Label htmlFor="ip-whitelist">IP Whitelist</Label>
-              <Textarea
-                id="ip-whitelist"
-                placeholder="Enter IP addresses or ranges (one per line)"
-                value={settings.ipWhitelist}
-                onChange={(e) => handleSettingChange("ipWhitelist", e.target.value)}
-                data-testid="textarea-ip-whitelist"
-              />
-              <p className="text-sm text-muted-foreground mt-1">
-                Restrict API access to specific IP addresses
-              </p>
-            </div>
-            <div>
-              <Label htmlFor="session-timeout">Session Timeout (hours)</Label>
-              <Input
-                id="session-timeout"
-                type="number"
-                value={settings.sessionTimeout}
-                onChange={(e) => handleSettingChange("sessionTimeout", e.target.value)}
-                data-testid="input-session-timeout"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* API Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Settings className="w-5 h-5 mr-2" />
+              <Zap className="w-5 h-5 mr-2" />
               API Settings
             </CardTitle>
-            <CardDescription>Configure API behavior and integration settings</CardDescription>
+            <CardDescription>Configure API behavior</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="rate-limit">Rate Limit (requests per hour)</Label>
+            <div className="space-y-2">
+              <Label>Default Rate Limit (per minute)</Label>
               <Input
-                id="rate-limit"
                 type="number"
-                value={settings.rateLimit}
-                onChange={(e) => handleSettingChange("rateLimit", e.target.value)}
-                data-testid="input-rate-limit"
+                value={settings.api_preferences.defaultRateLimit}
+                onChange={(e) => setSettings({
+                  ...settings,
+                  api_preferences: {
+                    ...settings.api_preferences,
+                    defaultRateLimit: parseInt(e.target.value) || 60
+                  }
+                })}
+                placeholder="60"
               />
             </div>
-            <div>
-              <Label htmlFor="webhook-url">Webhook URL</Label>
-              <Input
-                id="webhook-url"
-                type="url"
-                placeholder="https://your-domain.com/webhook"
-                value={settings.webhookUrl}
-                onChange={(e) => handleSettingChange("webhookUrl", e.target.value)}
-                data-testid="input-webhook-url"
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label>Webhooks Enabled</Label>
+                <p className="text-sm text-muted-foreground">Enable webhook notifications</p>
+              </div>
+              <Switch
+                checked={settings.api_preferences.webhooksEnabled}
+                onCheckedChange={(checked) => 
+                  setSettings({
+                    ...settings,
+                    api_preferences: {
+                      ...settings.api_preferences,
+                      webhooksEnabled: checked
+                    }
+                  })
+                }
               />
-              <p className="text-sm text-muted-foreground mt-1">
-                Receive real-time notifications about critical events
-              </p>
             </div>
-            <div>
-              <Label htmlFor="retry-attempts">Retry Attempts</Label>
-              <Select value={settings.retryAttempts} onValueChange={(value) => handleSettingChange("retryAttempts", value)}>
-                <SelectTrigger data-testid="select-retry-attempts">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1 attempt</SelectItem>
-                  <SelectItem value="3">3 attempts</SelectItem>
-                  <SelectItem value="5">5 attempts</SelectItem>
-                  <SelectItem value="10">10 attempts</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {settings.api_preferences.webhooksEnabled && (
+              <div className="space-y-2">
+                <Label>Webhook URL</Label>
+                <Input
+                  value={notificationSettings.webhook_url || ''}
+                  onChange={(e) => setNotificationSettings({
+                    ...notificationSettings,
+                    webhook_url: e.target.value
+                  })}
+                  placeholder="https://your-domain.com/webhook"
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Compliance Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Shield className="w-5 h-5 mr-2" />
-              Compliance Settings
-            </CardTitle>
-            <CardDescription>Configure automated compliance monitoring</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="auto-reporting">Automatic Reporting</Label>
-                <p className="text-sm text-muted-foreground">Generate compliance reports automatically</p>
-              </div>
-              <Switch
-                id="auto-reporting"
-                checked={settings.autoReporting}
-                onCheckedChange={(checked) => handleSettingChange("autoReporting", checked)}
-                data-testid="switch-auto-reporting"
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="pep-monitoring">PEP Monitoring</Label>
-                <p className="text-sm text-muted-foreground">Monitor for politically exposed persons</p>
-              </div>
-              <Switch
-                id="pep-monitoring"
-                checked={settings.pepMonitoring}
-                onCheckedChange={(checked) => handleSettingChange("pepMonitoring", checked)}
-                data-testid="switch-pep-monitoring"
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="sanctions-updates">Sanctions List Updates</Label>
-                <p className="text-sm text-muted-foreground">Automatic sanctions list synchronization</p>
-              </div>
-              <Switch
-                id="sanctions-updates"
-                checked={settings.sanctionsUpdates}
-                onCheckedChange={(checked) => handleSettingChange("sanctionsUpdates", checked)}
-                data-testid="switch-sanctions-updates"
-              />
-            </div>
-            <div>
-              <Label htmlFor="risk-threshold">Risk Score Threshold</Label>
-              <Input
-                id="risk-threshold"
-                type="number"
-                min="0"
-                max="100"
-                value={settings.riskThreshold}
-                onChange={(e) => handleSettingChange("riskThreshold", e.target.value)}
-                data-testid="input-risk-threshold"
-              />
-              <p className="text-sm text-muted-foreground mt-1">
-                Transactions above this score will be flagged
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
+        <div className="flex justify-end">
+          <Button onClick={handleSaveSettings} disabled={saving} className="px-8">
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save Changes
+          </Button>
+        </div>
       </div>
     </Layout>
   );

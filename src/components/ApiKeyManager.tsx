@@ -70,9 +70,9 @@ export function ApiKeyManager() {
         .insert({
           user_id: user.id,
           partner_id: partnerId,
-          key_name: keyName,
-          api_key: apiKey,
-          api_secret: apiSecret,
+          name: keyName,
+          key: apiKey,
+          secret: apiSecret,
           key_hash: keyHash,
           is_active: true,
           rate_limit_per_minute: 60,
@@ -244,11 +244,11 @@ export function ApiKeyManager() {
             <TableBody>
               {apiKeys.map((apiKey) => (
                 <TableRow key={apiKey.id}>
-                  <TableCell className="font-medium">{apiKey.key_name}</TableCell>
+                  <TableCell className="font-medium">{apiKey.name}</TableCell>
                   <TableCell>
                     <div className="flex items-center space-x-2">
                       <code className="text-sm bg-muted px-2 py-1 rounded">
-                        {formatApiKey(apiKey.api_key || '', apiKey.id)}
+                        {formatApiKey(apiKey.key || '', apiKey.id)}
                       </code>
                       <Button
                         variant="ghost"
@@ -264,7 +264,7 @@ export function ApiKeyManager() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => copyToClipboard(apiKey.api_key || '')}
+                        onClick={() => copyToClipboard(apiKey.key || '')}
                       >
                         <Copy className="w-4 h-4" />
                       </Button>

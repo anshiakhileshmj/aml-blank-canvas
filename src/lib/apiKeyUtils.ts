@@ -211,22 +211,35 @@ export async function getApiUsageStats() {
     .lte('created_at', new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0])
     .single();
 
-  // Get total calls this month from api_usage table
+  // Get total calls this month from api_usage table by joining with api_keys
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  const { data: usageLogs, error: usageError } = await supabase
-    .from('api_usage')
-    .select('*, api_keys!inner(user_id)')
-    .eq('api_keys.user_id', user.id)
-    .gte('created_at', startOfMonth.toISOString());
+  const { data: userApiKeys } = await supabase
+    .from('api_keys')
+    .select('id')
+    .eq('user_id', user.id);
 
-  if (usageError) throw usageError;
+  const apiKeyIds = userApiKeys?.map(key => key.id) || [];
 
-  const callsThisMonth = usageLogs?.length || 0;
-  const successfulCalls = usageLogs?.filter(log => log.status_code !== null && log.status_code !== undefined && log.status_code >= 200 && log.status_code < 300).length || 0;
-  const avgResponseTime = usageLogs?.reduce((sum, log) => sum + (log.response_time_ms || 0), 0) / (usageLogs?.length || 1) || 0;
+  let usageLogs: any[] = [];
+  if (apiKeyIds.length > 0) {
+    const { data, error: usageError } = await supabase
+      .from('api_usage')
+      .select('*')
+      .in('api_key_id', apiKeyIds)
+      .gte('timestamp', startOfMonth.toISOString());
+
+    if (usageError) throw usageError;
+    usageLogs = data || [];
+  }
+
+  const callsThisMonth = usageLogs.length;
+  const successfulCalls = usageLogs.filter(log => log.status_code && log.status_code >= 200 && log.status_code < 300).length;
+  const avgResponseTime = usageLogs.length > 0 
+    ? usageLogs.reduce((sum, log) => sum + (log.response_time_ms || 0), 0) / usageLogs.length 
+    : 0;
 
   return {
     callsThisMonth: callsThisMonth,

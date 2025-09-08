@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { AlertTriangle, FolderOpen, ShieldQuestion, BarChart3, TrendingUp, TrendingDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface MetricCardProps {
   title: string;
@@ -64,26 +64,24 @@ export function MetricsCards() {
 
       // Parallel queries for better performance
       const [transactionsResult, alertsResult, sanctionsResult, apiCallsResult] = await Promise.all([
-        // High risk transactions (risk_score >= 70)
+        // High risk relay logs (risk_score >= 70)
         supabase
-          .from('transactions')
+          .from('relay_logs')
           .select('risk_score, created_at')
-          .eq('user_id', user.id)
+          .in('partner_id', partnerIds)
           .gte('risk_score', 70)
           .gte('created_at', oneWeekAgo.toISOString()),
         
-        // Active alerts/cases
+        // Active risk events
         supabase
-          .from('alerts')
-          .select('status, created_at')
-          .eq('user_id', user.id)
-          .eq('status', 'active'),
-        
-        // Sanctions matches
-        supabase
-          .from('sanctions_matches')
+          .from('risk_events')
           .select('created_at')
-          .eq('user_id', user.id)
+          .gte('created_at', oneWeekAgo.toISOString()),
+        
+        // Sanctions matches from sanctioned wallets
+        supabase
+          .from('sanctioned_wallets')
+          .select('created_at')
           .gte('created_at', oneWeekAgo.toISOString()),
         
         // API calls from relay logs (today)

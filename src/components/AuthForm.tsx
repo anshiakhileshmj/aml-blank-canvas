@@ -184,10 +184,10 @@ const AuthForm = () => {
         const result = await signUp(email, password, metadata);
         if (result.error) throw result.error;
         
-        if (result.needsEmailConfirmation) {
+        if ((result as any).needsEmailConfirmation) {
           toast({
             title: "Check Your Email",
-            description: result.message || "Please check your email and click the confirmation link to complete your signup.",
+            description: (result as any).message || "Please check your email and click the confirmation link to complete your signup.",
           });
         } else {
           toast({
