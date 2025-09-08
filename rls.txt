@@ -1,0 +1,210 @@
+-- Enable RLS on all sensitive tables
+ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE api_usage ENABLE ROW LEVEL SECURITY;
+ALTER TABLE developer_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE relay_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE risk_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE risk_scores ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stablecoin_transfers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tracked_wallets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wallet_risk_ratings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wallet_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transaction_patterns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE network_associations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE risk_indicators ENABLE ROW LEVEL SECURITY;
+
+-- Enable RLS on public tables (docs/compliance) if not already
+ALTER TABLE api_endpoints ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sanctioned_wallets ENABLE ROW LEVEL SECURITY;
+
+-- =========================
+-- API ENDPOINTS (docs): public read, service role manage
+-- =========================
+DROP POLICY IF EXISTS "Allow public read access to api endpoints" ON api_endpoints;
+DROP POLICY IF EXISTS "Allow service role full access to api endpoints" ON api_endpoints;
+
+CREATE POLICY "Allow public read access to api endpoints"
+  ON api_endpoints FOR SELECT
+  USING (true);
+
+CREATE POLICY "Allow service role full access to api endpoints"
+  ON api_endpoints FOR ALL
+  USING ((auth.jwt() ->> 'role'::text) = 'service_role'::text);
+
+-- =========================
+-- SANCTIONED WALLETS: public read, service role manage
+-- =========================
+DROP POLICY IF EXISTS "Allow public read access to sanctioned wallets" ON sanctioned_wallets;
+DROP POLICY IF EXISTS "Allow service role full access to sanctioned wallets" ON sanctioned_wallets;
+
+CREATE POLICY "Allow public read access to sanctioned wallets"
+  ON sanctioned_wallets FOR SELECT
+  USING (true);
+
+CREATE POLICY "Allow service role full access to sanctioned wallets"
+  ON sanctioned_wallets FOR ALL
+  USING ((auth.jwt() ->> 'role'::text) = 'service_role'::text);
+
+-- =========================
+-- API KEYS: only owner or service role
+-- =========================
+DROP POLICY IF EXISTS "Users can manage their own API keys" ON api_keys;
+
+CREATE POLICY "Users can manage their own API keys"
+  ON api_keys FOR ALL
+  USING (
+    auth.uid() = user_id
+    OR (auth.jwt() ->> 'role'::text) = 'service_role'
+  );
+
+-- =========================
+-- API USAGE: only owner or service role
+-- =========================
+DROP POLICY IF EXISTS "Users can view their own API usage" ON api_usage;
+
+CREATE POLICY "Users can view their own API usage"
+  ON api_usage FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM api_keys
+      WHERE api_keys.id = api_usage.api_key_id
+        AND (api_keys.user_id = auth.uid() OR (auth.jwt() ->> 'role'::text) = 'service_role')
+    )
+  );
+
+-- =========================
+-- DEVELOPER PROFILES: only owner or service role
+-- =========================
+DROP POLICY IF EXISTS "Users can manage their own developer profile" ON developer_profiles;
+
+CREATE POLICY "Users can manage their own developer profile"
+  ON developer_profiles FOR ALL
+  USING (
+    auth.uid() = user_id
+    OR (auth.jwt() ->> 'role'::text) = 'service_role'
+  );
+
+-- =========================
+-- RELAY LOGS: only owner or service role
+-- =========================
+DROP POLICY IF EXISTS "Users can view their own relay logs" ON relay_logs;
+DROP POLICY IF EXISTS "Allow service role full access to relay logs" ON relay_logs;
+
+CREATE POLICY "Allow service role full access to relay logs"
+  ON relay_logs FOR ALL
+  USING ((auth.jwt() ->> 'role'::text) = 'service_role'::text);
+
+CREATE POLICY "Users can view their own relay logs"
+  ON relay_logs FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM api_keys
+      WHERE api_keys.partner_id = relay_logs.partner_id
+        AND (api_keys.user_id = auth.uid() OR (auth.jwt() ->> 'role'::text) = 'service_role')
+    )
+  );
+
+-- =========================
+-- RISK EVENTS: only service role (backend)
+-- =========================
+DROP POLICY IF EXISTS "Allow service role full access to risk events" ON risk_events;
+
+CREATE POLICY "Allow service role full access to risk events"
+  ON risk_events FOR ALL
+  USING ((auth.jwt() ->> 'role'::text) = 'service_role'::text);
+
+-- =========================
+-- RISK SCORES: only service role (backend)
+-- =========================
+DROP POLICY IF EXISTS "Allow service role full access to risk scores" ON risk_scores;
+
+CREATE POLICY "Allow service role full access to risk scores"
+  ON risk_scores FOR ALL
+  USING ((auth.jwt() ->> 'role'::text) = 'service_role'::text);
+
+-- =========================
+-- STABLECOIN TRANSFERS: only service role (backend)
+-- =========================
+DROP POLICY IF EXISTS "Allow service role full access to stablecoin transfers" ON stablecoin_transfers;
+
+CREATE POLICY "Allow service role full access to stablecoin transfers"
+  ON stablecoin_transfers FOR ALL
+  USING ((auth.jwt() ->> 'role'::text) = 'service_role'::text);
+
+-- =========================
+-- TRACKED WALLETS: only service role (backend)
+-- =========================
+DROP POLICY IF EXISTS "Allow service role full access to tracked wallets" ON tracked_wallets;
+
+CREATE POLICY "Allow service role full access to tracked wallets"
+  ON tracked_wallets FOR ALL
+  USING ((auth.jwt() ->> 'role'::text) = 'service_role'::text);
+
+-- =========================
+-- WALLET RISK RATINGS: only service role (backend)
+-- =========================
+DROP POLICY IF EXISTS "Allow service role full access to wallet risk ratings" ON wallet_risk_ratings;
+
+CREATE POLICY "Allow service role full access to wallet risk ratings"
+  ON wallet_risk_ratings FOR ALL
+  USING ((auth.jwt() ->> 'role'::text) = 'service_role'::text);
+
+-- =========================
+-- WALLET TRANSACTIONS: only service role (backend)
+-- =========================
+DROP POLICY IF EXISTS "Allow service role full access to wallet transactions" ON wallet_transactions;
+
+CREATE POLICY "Allow service role full access to wallet transactions"
+  ON wallet_transactions FOR ALL
+  USING ((auth.jwt() ->> 'role'::text) = 'service_role'::text);
+
+-- =========================
+-- TRANSACTION PATTERNS: only service role (backend)
+-- =========================
+DROP POLICY IF EXISTS "Allow service role full access to transaction patterns" ON transaction_patterns;
+
+CREATE POLICY "Allow service role full access to transaction patterns"
+  ON transaction_patterns FOR ALL
+  USING ((auth.jwt() ->> 'role'::text) = 'service_role'::text);
+
+-- =========================
+-- NETWORK ASSOCIATIONS: only service role (backend)
+-- =========================
+DROP POLICY IF EXISTS "Allow service role full access to network associations" ON network_associations;
+
+CREATE POLICY "Allow service role full access to network associations"
+  ON network_associations FOR ALL
+  USING ((auth.jwt() ->> 'role'::text) = 'service_role'::text);
+
+-- =========================
+-- RISK INDICATORS: only service role (backend)
+-- =========================
+DROP POLICY IF EXISTS "Allow service role full access to risk indicators" ON risk_indicators;
+
+CREATE POLICY "Allow service role full access to risk indicators"
+  ON risk_indicators FOR ALL
+  USING ((auth.jwt() ->> 'role'::text) = 'service_role'::text);
+
+-- =========================
+-- ENABLE RLS ON ALL TABLES (for safety)
+-- =========================
+DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+  LOOP
+    EXECUTE 'ALTER TABLE public.' || quote_ident(r.tablename) || ' ENABLE ROW LEVEL SECURITY;';
+  END LOOP;
+END;
+$$;
+
+-- =========================
+-- SUMMARY
+-- =========================
+-- 1. Only public tables (api_endpoints, sanctioned_wallets) are readable by anyone.
+-- 2. All sensitive tables require auth.uid() or service_role.
+-- 3. Service role can always access everything for backend jobs.
+-- 4. Your relay-api and app endpoints will work as long as they use the user's JWT or the service role key.
+
+-- No columns are public except those in api_endpoints and sanctioned_wallets.

@@ -1,0 +1,450 @@
+-- EXTENSIONS (required for gen_random_uuid and cryptography)
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- =========================
+-- 1. API ENDPOINTS TABLE
+-- =========================
+CREATE TABLE public.api_endpoints (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    name text NOT NULL,
+    method text NOT NULL,
+    path text NOT NULL,
+    description text NOT NULL,
+    parameters jsonb DEFAULT '{}'::jsonb,
+    response_schema jsonb DEFAULT '{}'::jsonb,
+    rate_limit integer DEFAULT 60,
+    category text NOT NULL,
+    example_request text,
+    example_response text,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+-- Public read access
+CREATE POLICY "Allow public read access to api endpoints" 
+ON api_endpoints FOR SELECT USING (true);
+
+-- Service role full access
+CREATE POLICY "Allow service role full access to api endpoints" 
+ON api_endpoints FOR ALL 
+USING ((auth.jwt() ->> 'role'::text) = 'service_role'::text);
+
+-- =========================
+-- 2. API KEYS TABLE
+-- =========================
+CREATE TABLE public.api_keys (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    name text NOT NULL,
+    key text,
+    key_hash text NOT NULL,
+    partner_id text,
+    user_id uuid,
+    is_active boolean NOT NULL DEFAULT true,
+    active boolean DEFAULT true,
+    expires_at timestamp with time zone,
+    last_used_at timestamp with time zone,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    rate_limit_per_minute integer NOT NULL DEFAULT 60
+);
+
+-- RLS: Only owner can manage their keys
+CREATE POLICY "Users can manage their own API keys" 
+ON api_keys FOR ALL 
+USING (auth.uid() = user_id);
+
+-- =========================
+-- 3. API USAGE TABLE
+-- =========================
+CREATE TABLE public.api_usage (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    api_key_id uuid NOT NULL,
+    endpoint text NOT NULL,
+    ip_address text,
+    timestamp timestamp with time zone NOT NULL DEFAULT now(),
+    response_time_ms integer,
+    status_code integer
+);
+
+-- RLS: Only owner can view usage for their keys
+CREATE POLICY "Users can view their own API usage" 
+ON api_usage FOR SELECT 
+USING (EXISTS (
+  SELECT 1 FROM api_keys 
+  WHERE api_keys.id = api_usage.api_key_id 
+    AND api_keys.user_id = auth.uid()
+));
+
+-- =========================
+-- 4. DEVELOPER PROFILES TABLE
+-- =========================
+CREATE TABLE public.developer_profiles (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id uuid NOT NULL,
+    company_name text,
+    website text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    api_usage_plan text DEFAULT 'free'::text,
+    monthly_request_limit integer DEFAULT 1000
+);
+
+-- RLS: Only owner can manage their profile
+CREATE POLICY "Users can manage their own developer profile" 
+ON developer_profiles FOR ALL 
+USING (auth.uid() = user_id);
+
+-- Auto-create profile on signup
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+BEGIN
+  INSERT INTO public.developer_profiles (user_id, company_name, website, api_usage_plan, monthly_request_limit)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data ->> 'company_name', ''),
+    COALESCE(NEW.raw_user_meta_data ->> 'website', ''),
+    'free',
+    1000
+  );
+  RETURN NEW;
+END;
+$function$;
+
+-- =========================
+-- 5. SANCTIONED WALLETS TABLE
+-- =========================
+CREATE TABLE public.sanctioned_wallets (
+    address text NOT NULL PRIMARY KEY,
+    source text NOT NULL DEFAULT 'OFAC'::text,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- Public read access
+CREATE POLICY "Allow public read access to sanctioned wallets" 
+ON sanctioned_wallets FOR SELECT USING (true);
+
+-- Service role full access
+CREATE POLICY "Allow service role full access to sanctioned wallets" 
+ON sanctioned_wallets FOR ALL 
+USING ((auth.jwt() ->> 'role'::text) = 'service_role'::text);
+
+-- =========================
+-- 6. RELAY LOGS TABLE
+-- =========================
+CREATE SEQUENCE IF NOT EXISTS relay_logs_id_seq;
+
+CREATE TABLE public.relay_logs (
+    id integer NOT NULL DEFAULT nextval('relay_logs_id_seq'::regclass) PRIMARY KEY,
+    partner_id text,
+    chain text NOT NULL,
+    from_addr text,
+    to_addr text NOT NULL,
+    risk_score integer NOT NULL DEFAULT 0,
+    risk_band text NOT NULL,
+    decision text NOT NULL,
+    reasons text[] DEFAULT '{}'::text[],
+    tx_hash text,
+    idempotency_key text,
+    created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- Service role full access
+CREATE POLICY "Allow service role full access to relay logs" 
+ON relay_logs FOR ALL 
+USING ((auth.jwt() ->> 'role'::text) = 'service_role'::text);
+
+-- Users can view logs for their API keys
+CREATE POLICY "Users can view their own relay logs" 
+ON relay_logs FOR SELECT 
+USING (EXISTS (
+  SELECT 1 FROM api_keys 
+  WHERE api_keys.partner_id = relay_logs.partner_id 
+    AND api_keys.user_id = auth.uid()
+));
+
+-- =========================
+-- 7. RISK EVENTS TABLE
+-- =========================
+CREATE TABLE public.risk_events (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    wallet text NOT NULL,
+    feature text NOT NULL,
+    category character varying DEFAULT 'BEHAVIORAL',
+    details jsonb DEFAULT '{}'::jsonb,
+    weight_applied integer NOT NULL DEFAULT 0,
+    confidence numeric DEFAULT 1.0,
+    metadata jsonb,
+    occurred_at timestamp with time zone DEFAULT now(),
+    timestamp timestamp with time zone NOT NULL DEFAULT now(),
+    created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- =========================
+-- 8. RISK SCORES TABLE
+-- =========================
+CREATE TABLE public.risk_scores (
+    wallet text NOT NULL,
+    score integer NOT NULL DEFAULT 0,
+    band text NOT NULL DEFAULT 'LOW'::text,
+    confidence numeric DEFAULT 1.0,
+    metadata jsonb,
+    last_updated timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now(),
+    id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    risk_factors jsonb DEFAULT '[]'::jsonb,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+-- =========================
+-- 9. STABLECOIN TRANSFERS TABLE
+-- =========================
+CREATE TABLE public.stablecoin_transfers (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    sender_address text NOT NULL,
+    receiver_address text NOT NULL,
+    token_symbol text NOT NULL,
+    token_name text NOT NULL,
+    amount numeric NOT NULL,
+    network text NOT NULL DEFAULT 'ethereum'::text,
+    block_time timestamp with time zone NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- =========================
+-- 10. TRACKED WALLETS TABLE
+-- =========================
+CREATE TABLE public.tracked_wallets (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    address text NOT NULL,
+    name text,
+    network text NOT NULL DEFAULT 'eth'::text,
+    created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- =========================
+-- 11. WALLET RISK RATINGS TABLE
+-- =========================
+CREATE TABLE public.wallet_risk_ratings (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    wallet_address text NOT NULL,
+    risk_score integer,
+    risk_level text,
+    total_transactions integer NOT NULL DEFAULT 0,
+    failed_transactions integer NOT NULL DEFAULT 0,
+    failed_tx_ratio numeric,
+    wallet_age_days integer,
+    first_tx_date timestamp with time zone,
+    network text DEFAULT 'ethereum'::text,
+    last_updated timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- =========================
+-- 12. WALLET TRANSACTIONS TABLE
+-- =========================
+CREATE TABLE public.wallet_transactions (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    wallet_address text NOT NULL,
+    tx_hash text NOT NULL,
+    from_address text NOT NULL,
+    to_address text NOT NULL,
+    value_eth numeric NOT NULL,
+    timestamp timestamp with time zone NOT NULL,
+    is_error boolean NOT NULL DEFAULT false,
+    created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- =========================
+-- 13. TRANSACTION PATTERNS TABLE
+-- =========================
+CREATE TABLE public.transaction_patterns (
+    id BIGSERIAL PRIMARY KEY,
+    wallet TEXT NOT NULL,
+    pattern_type TEXT NOT NULL,
+    pattern_data JSONB NOT NULL,
+    confidence DECIMAL(3,2) DEFAULT 0.80,
+    detected_at TIMESTAMPTZ DEFAULT NOW(),
+    is_active BOOLEAN DEFAULT true
+);
+
+-- =========================
+-- 14. NETWORK ASSOCIATIONS TABLE
+-- =========================
+CREATE TABLE public.network_associations (
+    id BIGSERIAL PRIMARY KEY,
+    wallet TEXT NOT NULL,
+    associated_wallet TEXT NOT NULL,
+    association_type TEXT NOT NULL,
+    strength DECIMAL(3,2) DEFAULT 1.00,
+    first_seen TIMESTAMPTZ DEFAULT NOW(),
+    last_seen TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(wallet, associated_wallet)
+);
+
+-- =========================
+-- 15. RISK INDICATORS TABLE
+-- =========================
+CREATE TABLE public.risk_indicators (
+    id BIGSERIAL PRIMARY KEY,
+    indicator_key TEXT NOT NULL UNIQUE,
+    category TEXT NOT NULL,
+    base_weight DECIMAL(5,2) NOT NULL,
+    half_life_days INTEGER NOT NULL DEFAULT 30,
+    is_critical BOOLEAN DEFAULT false,
+    description TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =========================
+-- 16. FUNCTIONS
+-- =========================
+
+-- Hash API Key
+CREATE OR REPLACE FUNCTION public.hash_api_key(api_key text)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+BEGIN
+  RETURN encode(sha256(api_key::bytea), 'hex');
+END;
+$function$;
+
+-- Generate API Key
+CREATE OR REPLACE FUNCTION public.generate_api_key()
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  key_prefix TEXT := 'wm_';
+  random_part TEXT;
+  full_key TEXT;
+BEGIN
+  random_part := replace(gen_random_uuid()::text, '-', '');
+  random_part := random_part || replace(gen_random_uuid()::text, '-', '');
+  random_part := upper(substring(random_part, 1, 32));
+  full_key := key_prefix || random_part;
+  RETURN full_key;
+END;
+$function$;
+
+-- Check API Rate Limit
+CREATE OR REPLACE FUNCTION public.check_api_rate_limit(api_key_hash text, endpoint text)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+DECLARE
+  key_record RECORD;
+  usage_count INTEGER;
+  rate_limit INTEGER;
+BEGIN
+  SELECT * INTO key_record 
+  FROM api_keys 
+  WHERE key_hash = api_key_hash AND is_active = true 
+    AND (expires_at IS NULL OR expires_at > now());
+  
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
+  
+  rate_limit := key_record.rate_limit_per_minute;
+  
+  SELECT COUNT(*) INTO usage_count
+  FROM api_usage
+  WHERE api_key_id = key_record.id 
+    AND endpoint = check_api_rate_limit.endpoint
+    AND timestamp > now() - interval '1 minute';
+  
+  UPDATE api_keys 
+  SET last_used_at = now() 
+  WHERE id = key_record.id;
+  
+  RETURN usage_count < rate_limit;
+END;
+$function$;
+
+-- Log API Usage
+CREATE OR REPLACE FUNCTION public.log_api_usage(api_key_hash text, endpoint_path text, ip_addr text, status_code integer, response_time_ms integer)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+DECLARE
+  key_id uuid;
+BEGIN
+  SELECT id INTO key_id 
+  FROM api_keys 
+  WHERE key_hash = api_key_hash;
+  
+  IF FOUND THEN
+    INSERT INTO api_usage (api_key_id, endpoint, ip_address, status_code, response_time_ms)
+    VALUES (key_id, endpoint_path, ip_addr, status_code, response_time_ms);
+  END IF;
+END;
+$function$;
+
+-- Risk Score Update
+CREATE OR REPLACE FUNCTION update_risk_score(
+    p_wallet TEXT,
+    p_score INTEGER,
+    p_band TEXT,
+    p_confidence DECIMAL DEFAULT 0.80,
+    p_risk_factors JSONB DEFAULT '[]'::jsonb
+) RETURNS VOID AS $$
+BEGIN
+    INSERT INTO risk_scores (wallet, score, band, confidence, risk_factors, updated_at, created_at)
+    VALUES (p_wallet, p_score, p_band, p_confidence, p_risk_factors, NOW(), NOW())
+    ON CONFLICT (wallet) DO UPDATE SET
+        score = EXCLUDED.score,
+        band = EXCLUDED.band,
+        confidence = EXCLUDED.confidence,
+        risk_factors = EXCLUDED.risk_factors,
+        updated_at = NOW();
+END;
+$$ LANGUAGE plpgsql;
+
+-- Log Risk Event
+CREATE OR REPLACE FUNCTION log_risk_event(
+    p_wallet TEXT,
+    p_feature TEXT,
+    p_category TEXT DEFAULT 'BEHAVIORAL',
+    p_details JSONB DEFAULT '{}'::jsonb,
+    p_weight_applied INTEGER DEFAULT 0
+) RETURNS VOID AS $$
+BEGIN
+    INSERT INTO risk_events (wallet, feature, category, details, weight_applied, timestamp, created_at)
+    VALUES (p_wallet, p_feature, p_category, p_details, p_weight_applied, NOW(), NOW());
+END;
+$$ LANGUAGE plpgsql;
+
+-- =========================
+-- 17. VIEWS
+-- =========================
+
+CREATE OR REPLACE VIEW wallet_risk_summary AS
+SELECT 
+    rs.wallet,
+    rs.score,
+    rs.band,
+    rs.confidence,
+    rs.risk_factors,
+    rs.updated_at as last_updated,
+    rs.created_at,
+    COUNT(re.id) as event_count,
+    COUNT(DISTINCT re.feature) as unique_features,
+    COUNT(DISTINCT re.category) as risk_categories,
+    COUNT(tp.id) as pattern_count,
+    COUNT(na.id) as association_count
+FROM risk_scores rs
+LEFT JOIN risk_events re ON rs.wallet = re.wallet
+LEFT JOIN transaction_patterns tp ON rs.wallet = tp.wallet AND tp.is_active = true
+LEFT JOIN network_associations na ON rs.wallet = na.wallet
+GROUP BY rs.wallet, rs.score, rs.band, rs.confidence, rs.risk_factors, rs.updated_at, rs.created_at;
