@@ -124,7 +124,6 @@ export default function Settings() {
           </div>
         </div>
 
-
         {/* Notifications Section */}
         <Card>
           <CardHeader>
