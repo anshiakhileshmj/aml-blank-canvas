@@ -44,7 +44,7 @@ export default function ProfilePage() {
 
       try {
         const { data, error } = await supabase
-          .from('profiles')
+          .from('developer_profiles')
           .select('*')
           .eq('user_id', user.id)
           .single();
@@ -61,16 +61,16 @@ export default function ProfilePage() {
 
         if (data) {
           setProfile({
-            fullName: data.full_name || `${data.first_name || ''} ${data.last_name || ''}`.trim(),
-            email: data.email || user.email || '',
+            fullName: `${data.first_name || ''} ${data.last_name || ''}`.trim(),
+            email: user.email || '',
             phone: data.phone || '',
             company: data.company_name || '',
             jobTitle: data.job_title || '',
-            department: data.department || '',
-            location: data.location || '',
-            bio: data.bio || '',
-            website: data.company_website || '',
-            linkedin: data.linkedin_profile || '',
+            department: data.business_type || '',
+            location: data.country || '',
+            bio: '',
+            website: data.website || '',
+            linkedin: '',
             businessType: data.business_type || '',
             joinedDate: data.created_at || '',
             lastLogin: user.last_sign_in_at || '',
@@ -139,18 +139,16 @@ export default function ProfilePage() {
     setSaving(true);
     try {
       const { error } = await supabase
-        .from('profiles')
+        .from('developer_profiles')
         .update({
-          full_name: profile.fullName,
+          first_name: profile.fullName.split(' ')[0] || '',
+          last_name: profile.fullName.split(' ').slice(1).join(' ') || '',
           phone: profile.phone,
-          location: profile.location,
-          bio: profile.bio,
+          country: profile.location,
           company_name: profile.company,
           job_title: profile.jobTitle,
-          department: profile.department,
-          company_website: profile.website,
-          linkedin_profile: profile.linkedin,
           business_type: profile.businessType,
+          website: profile.website,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id);

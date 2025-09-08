@@ -20,45 +20,53 @@ export function useSubscriptionUsage() {
         .select('*')
         .eq('user_id', user.id)
         .eq('billing_period_start', startOfMonth.toISOString().split('T')[0])
-        .single();
+        .maybeSingle();
 
-      if (usageError && usageError.code !== 'PGRST116') {
+      if (usageError) {
         throw usageError;
       }
 
       // Get user profile for plan info
       const { data: profile, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('subscription_plan, api_calls_limit')
-        .eq('id', user.id)
-        .single();
+        .from('developer_profiles')
+        .select('api_usage_plan, monthly_request_limit')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
       if (profileError) throw profileError;
 
       // Get API usage for current month
-      const { data: apiUsage, error: apiError } = await supabase
-        .from('relay_logs')
-        .select('id, created_at')
-        .gte('created_at', startOfMonth.toISOString())
-        .in('partner_id', 
-          supabase
-            .from('api_keys')
-            .select('partner_id')
-            .eq('user_id', user.id)
-        );
+      const { data: apiKeys, error: keysError } = await supabase
+        .from('api_keys')
+        .select('partner_id')
+        .eq('user_id', user.id);
 
-      if (apiError) throw apiError;
+      if (keysError) throw keysError;
+
+      const partnerIds = apiKeys?.map(key => key.partner_id).filter(Boolean) || [];
+      
+      let apiUsage: any[] = [];
+      if (partnerIds.length > 0) {
+        const { data: relayData, error: apiError } = await supabase
+          .from('relay_logs')
+          .select('id, created_at')
+          .gte('created_at', startOfMonth.toISOString())
+          .in('partner_id', partnerIds);
+
+        if (apiError) throw apiError;
+        apiUsage = relayData || [];
+      }
 
       const currentUsage = usage || {
-        api_calls_used: apiUsage?.length || 0,
-        api_calls_limit: profile.api_calls_limit,
-        transactions_processed: apiUsage?.length || 0,
+        api_calls_used: apiUsage.length || 0,
+        api_calls_limit: profile?.monthly_request_limit || 1000,
+        transactions_processed: apiUsage.length || 0,
       };
 
       return {
         ...currentUsage,
-        subscription_plan: profile.subscription_plan,
-        usage_percentage: (currentUsage.api_calls_used / currentUsage.api_calls_limit) * 100,
+        subscription_plan: profile?.api_usage_plan || 'free',
+        usage_percentage: ((currentUsage.api_calls_used || 0) / (currentUsage.api_calls_limit || 1000)) * 100,
       };
     },
     enabled: !!user,

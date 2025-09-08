@@ -4,11 +4,11 @@ export interface SubscriptionUsage {
   id?: string;
   user_id?: string;
   plan_type: string;
-  api_calls_used: number;
-  api_calls_limit: number;
+  api_calls_used: number | null;
+  api_calls_limit: number | null;
   billing_period_start: string;
   billing_period_end: string;
-  overage_charges: number;
+  overage_charges: number | null;
 }
 
 export async function getCurrentSubscriptionUsage(): Promise<SubscriptionUsage | null> {
@@ -49,10 +49,20 @@ export async function getCurrentSubscriptionUsage(): Promise<SubscriptionUsage |
       .single();
 
     if (insertError) throw insertError;
-    return newUsage;
+    return {
+      ...newUsage,
+      api_calls_used: newUsage.api_calls_used || 0,
+      api_calls_limit: newUsage.api_calls_limit || 1000,
+      overage_charges: newUsage.overage_charges || 0
+    };
   }
 
-  return data;
+  return {
+    ...data,
+    api_calls_used: data.api_calls_used || 0,
+    api_calls_limit: data.api_calls_limit || 1000,
+    overage_charges: data.overage_charges || 0
+  };
 }
 
 export async function getBillingHistory() {

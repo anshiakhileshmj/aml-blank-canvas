@@ -44,7 +44,14 @@ export async function getUserSettings(): Promise<UserSettings | null> {
     };
   }
 
-  return data;
+  return {
+    id: data.id,
+    user_id: data.user_id,
+    notification_preferences: (data.notification_preferences as any) || { email: true, push: false, alerts: true },
+    security_settings: (data.security_settings as any) || { twoFactorEnabled: false, sessionTimeout: 30 },
+    display_preferences: (data.display_preferences as any) || { theme: 'system', language: 'en' },
+    api_preferences: (data.api_preferences as any) || { defaultRateLimit: 60, webhooksEnabled: false }
+  };
 }
 
 export async function updateUserSettings(settings: Partial<UserSettings>): Promise<UserSettings> {
@@ -62,7 +69,15 @@ export async function updateUserSettings(settings: Partial<UserSettings>): Promi
     .single();
 
   if (error) throw error;
-  return data;
+  
+  return {
+    id: data.id,
+    user_id: data.user_id,
+    notification_preferences: (data.notification_preferences as any) || { email: true, push: false, alerts: true },
+    security_settings: (data.security_settings as any) || { twoFactorEnabled: false, sessionTimeout: 30 },
+    display_preferences: (data.display_preferences as any) || { theme: 'system', language: 'en' },
+    api_preferences: (data.api_preferences as any) || { defaultRateLimit: 60, webhooksEnabled: false }
+  };
 }
 
 export async function getNotificationSettings() {

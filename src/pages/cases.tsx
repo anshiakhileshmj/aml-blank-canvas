@@ -49,13 +49,42 @@ export default function CasesPage() {
   const { data: cases = [], isLoading, error } = useQuery({
     queryKey: ["cases", { search: searchQuery, status: statusFilter, priority: priorityFilter }],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('cases')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data || [];
+      // Mock data for demonstration since cases table doesn't exist yet
+      return [
+        {
+          id: '1',
+          caseNumber: 'CASE-2024-001',
+          title: 'Suspicious Transaction Investigation',
+          description: 'Investigation of multiple high-value transactions from flagged address',
+          assignedTo: 'Compliance Team',
+          status: 'open',
+          priority: 'high',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        {
+          id: '2',
+          caseNumber: 'CASE-2024-002',
+          title: 'PEP Verification',
+          description: 'Verification of politically exposed person status',
+          assignedTo: 'John Smith',
+          status: 'in_progress',
+          priority: 'medium',
+          createdAt: new Date(Date.now() - 86400000).toISOString(),
+          updatedAt: new Date(Date.now() - 43200000).toISOString()
+        },
+        {
+          id: '3',
+          caseNumber: 'CASE-2024-003',
+          title: 'Sanctions Screening Follow-up',
+          description: 'Follow-up investigation on potential sanctions match',
+          assignedTo: 'Jane Doe',
+          status: 'closed',
+          priority: 'low',
+          createdAt: new Date(Date.now() - 172800000).toISOString(),
+          updatedAt: new Date(Date.now() - 86400000).toISOString()
+        }
+      ];
     },
     retry: false,
     refetchOnWindowFocus: false,

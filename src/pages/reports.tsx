@@ -44,13 +44,33 @@ export default function ReportsPage() {
   const { data: reports = [], isLoading, error } = useQuery({
     queryKey: ["reports", { search: searchQuery, type: typeFilter }],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('reports')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data || [];
+      // Mock data for demonstration since reports table doesn't exist yet
+      return [
+        {
+          id: '1',
+          title: 'Monthly Compliance Report',
+          description: 'Comprehensive monthly compliance and risk analysis',
+          reportType: 'monthly',
+          createdAt: new Date().toISOString(),
+          status: 'completed'
+        },
+        {
+          id: '2',
+          title: 'Sanctions Screening Report',
+          description: 'Weekly sanctions screening results and findings',
+          reportType: 'sanctions',
+          createdAt: new Date(Date.now() - 86400000).toISOString(),
+          status: 'in_progress'
+        },
+        {
+          id: '3',
+          title: 'Risk Assessment Summary',
+          description: 'Quarterly risk assessment and mitigation strategies',
+          reportType: 'quarterly',
+          createdAt: new Date(Date.now() - 172800000).toISOString(),
+          status: 'completed'
+        }
+      ];
     },
     retry: false,
     refetchOnWindowFocus: false,

@@ -231,7 +231,7 @@ export default function Billing() {
                     </div>
                     <div className="flex items-center space-x-4">
                       <div className="text-right">
-                        <div className="font-medium">${amount + invoice.overage_charges}</div>
+                        <div className="font-medium">${amount + (invoice.overage_charges || 0)}</div>
                         <Badge variant="default">paid</Badge>
                       </div>
                       <Button 
