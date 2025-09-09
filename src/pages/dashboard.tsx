@@ -5,8 +5,6 @@ import { TransactionFeed } from "@/components/dashboard/TransactionFeed";
 import { AlertsPanel } from "@/components/dashboard/AlertsPanel";
 import { RiskAnalytics } from "@/components/dashboard/RiskAnalytics";
 import { RiskHeatmap } from "@/components/dashboard/RiskHeatmap";
-import { CaseManagement } from "@/components/dashboard/CaseManagement";
-import { ComplianceReports } from "@/components/dashboard/ComplianceReports";
 import { AdvancedFiltering } from "@/components/dashboard/AdvancedFiltering";
 import { ApiManagement } from "@/components/dashboard/inline/ApiManagement";
 import { Settings } from "@/components/dashboard/inline/Settings";
@@ -113,17 +111,6 @@ export default function Dashboard() {
           <Billing />
           <Profile />
 
-          {/* Case Management and Compliance Reports */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Case Management */}
-            <CaseManagement />
-
-            {/* Compliance Reports */}
-            <ComplianceReports />
-          </div>
-
-          {/* Advanced Filtering and Search */}
-          <AdvancedFiltering />
         </main>
       </div>
     </div>
