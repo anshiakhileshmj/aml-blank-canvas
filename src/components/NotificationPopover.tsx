@@ -155,7 +155,7 @@ export const NotificationPopover = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="absolute right-0 mt-2 w-80 max-h-[400px] overflow-y-auto rounded-xl shadow-lg bg-card dark:bg-card border border-border dark:border-border"
+            className="absolute right-0 mt-2 w-80 max-h-[400px] overflow-y-auto rounded-xl shadow-lg bg-card dark:bg-card border border-border dark:border-border z-50"
           >
             <div className="p-4 border-b border-border dark:border-border flex justify-between items-center">
               <h3 className="text-sm font-medium text-card-foreground dark:text-card-foreground">
