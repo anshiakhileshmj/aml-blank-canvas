@@ -1,5 +1,6 @@
 import os
 import logging
+import httpx
 from typing import Optional, Dict, List, Any, Tuple
 
 from fastapi import FastAPI, Header, HTTPException, Depends, Security
@@ -236,6 +237,25 @@ def get_w3(chain: str) -> Web3:
 sanctions_checker = local_sanctions_checker
 
 bearer_scheme = HTTPBearer(auto_error=False)
+
+async def call_webhook(transaction_data: Dict[str, Any]) -> None:
+	"""Call the main app's webhook to log transaction data"""
+	webhook_url = "https://yfwbsjokktasumghrznk.supabase.co/functions/v1/relay-webhook"
+	
+	try:
+		async with httpx.AsyncClient() as client:
+			response = await client.post(
+				webhook_url,
+				json=transaction_data,
+				timeout=10.0
+			)
+			if response.status_code == 200:
+				print(f"✅ Successfully sent transaction data to webhook")
+			else:
+				print(f"⚠️ Webhook call failed with status {response.status_code}: {response.text}")
+	except Exception as e:
+		print(f"❌ Error calling webhook: {e}")
+
 
 def get_partner_id_from_api_key(authorization: Optional[str] = Header(default=None)) -> str:
 	# Support both "Bearer <key>" and raw key in Authorization header,
@@ -521,6 +541,28 @@ async def v1_relay(body: RelayRequest, partner_id: str = Depends(get_partner_id_
 		pass
 
 	if not decision.allowed:
+		# Send blocked transaction data to webhook
+		webhook_data = {
+			"partner_id": partner_id,
+			"from_address": None,
+			"to_address": to,
+			"amount": 0,
+			"currency": "ETH",
+			"blockchain": body.chain,
+			"tx_hash": None,
+			"status": "blocked",
+			"risk_level": decision.risk_band,
+			"risk_score": decision.risk_score,
+			"description": f"Transaction blocked: {', '.join(reasons or decision.reasons)}"
+		}
+		
+		# Call webhook (non-blocking)
+		try:
+			import asyncio
+			asyncio.create_task(call_webhook(webhook_data))
+		except Exception as e:
+			print(f"Warning: Failed to call webhook for blocked transaction: {e}")
+		
 		return JSONResponse(status_code=403, content={
 			"allowed": False,
 			"risk_band": decision.risk_band,
@@ -555,6 +597,28 @@ async def v1_relay(body: RelayRequest, partner_id: str = Depends(get_partner_id_
 				sb.table("relay_logs").update({"tx_hash": tx_hex}).eq("id", log_id).execute()
 			except Exception as log_error:
 				print(f"Warning: Failed to update log with tx_hash: {log_error}")
+		
+		# Send successful transaction data to webhook
+		webhook_data = {
+			"partner_id": partner_id,
+			"from_address": None,
+			"to_address": to,
+			"amount": 0,
+			"currency": "ETH",
+			"blockchain": body.chain,
+			"tx_hash": tx_hex,
+			"status": "completed",
+			"risk_level": decision.risk_band,
+			"risk_score": decision.risk_score,
+			"description": f"Transaction completed successfully via relay API"
+		}
+		
+		# Call webhook (non-blocking)
+		try:
+			import asyncio
+			asyncio.create_task(call_webhook(webhook_data))
+		except Exception as e:
+			print(f"Warning: Failed to call webhook for successful transaction: {e}")
 		
 		return JSONResponse(content={
 			"allowed": True,
