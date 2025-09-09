@@ -238,9 +238,12 @@ sanctions_checker = local_sanctions_checker
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
-async def call_webhook(transaction_data: Dict[str, Any]) -> None:
+async def call_webhook(transaction_data: Dict[str, Any], api_key: str) -> None:
 	"""Call the main app's webhook to log transaction data"""
 	webhook_url = "https://yfwbsjokktasumghrznk.supabase.co/functions/v1/relay-webhook"
+	
+	# Add API key hash to transaction data for user identification
+	transaction_data["api_key_hash"] = api_key
 	
 	try:
 		async with httpx.AsyncClient() as client:
@@ -257,7 +260,7 @@ async def call_webhook(transaction_data: Dict[str, Any]) -> None:
 		print(f"❌ Error calling webhook: {e}")
 
 
-def get_partner_id_from_api_key(authorization: Optional[str] = Header(default=None)) -> str:
+def get_partner_id_and_api_key(authorization: Optional[str] = Header(default=None)) -> tuple[str, str]:
 	# Support both "Bearer <key>" and raw key in Authorization header,
 	# and also FastAPI HTTPBearer if configured later.
 	api_key = None
@@ -271,6 +274,7 @@ def get_partner_id_from_api_key(authorization: Optional[str] = Header(default=No
 		# Try to find by key_hash first (primary storage), then by key (fallback)
 		res = sb.table("api_keys").select("partner_id,is_active").eq("key_hash", api_key).limit(1).execute()
 		rows = res.data or []
+		found_by_hash = bool(rows)
 		if not rows:
 			# Fallback to key column if key_hash not found
 			res = sb.table("api_keys").select("partner_id,is_active").eq("key", api_key).limit(1).execute()
@@ -286,12 +290,18 @@ def get_partner_id_from_api_key(authorization: Optional[str] = Header(default=No
 		if not partner_id:
 			raise HTTPException(status_code=500, detail="API key missing partner_id")
 		
-		return str(partner_id)
+		# Return the key for webhook identification (use hash if found by hash, otherwise original key)
+		webhook_key = api_key if found_by_hash else api_key
+		return str(partner_id), webhook_key
 	except HTTPException:
 		raise
 	except Exception as e:
 		print(f"Error validating API key: {e}")
 		raise HTTPException(status_code=500, detail="Internal server error during API key validation")
+
+def get_partner_id_from_api_key(authorization: Optional[str] = Header(default=None)) -> str:
+	partner_id, _ = get_partner_id_and_api_key(authorization)
+	return partner_id
 
 
 @app.on_event("startup")
@@ -485,7 +495,9 @@ async def v1_check(body: CheckRequest, partner_id: str = Depends(get_partner_id_
 
 
 @app.post("/v1/relay", response_model=RelayResponse)
-async def v1_relay(body: RelayRequest, partner_id: str = Depends(get_partner_id_from_api_key)):
+async def v1_relay(body: RelayRequest, partner_and_key: tuple[str, str] = Depends(get_partner_id_and_api_key)):
+	partner_id, api_key = partner_and_key
+	
 	if not is_hex_string(body.rawTx):
 		raise HTTPException(status_code=400, detail="rawTx must be 0x-hex string")
 
@@ -559,7 +571,7 @@ async def v1_relay(body: RelayRequest, partner_id: str = Depends(get_partner_id_
 		# Call webhook (non-blocking)
 		try:
 			import asyncio
-			asyncio.create_task(call_webhook(webhook_data))
+			asyncio.create_task(call_webhook(webhook_data, api_key))
 		except Exception as e:
 			print(f"Warning: Failed to call webhook for blocked transaction: {e}")
 		
@@ -616,7 +628,7 @@ async def v1_relay(body: RelayRequest, partner_id: str = Depends(get_partner_id_
 		# Call webhook (non-blocking)
 		try:
 			import asyncio
-			asyncio.create_task(call_webhook(webhook_data))
+			asyncio.create_task(call_webhook(webhook_data, api_key))
 		except Exception as e:
 			print(f"Warning: Failed to call webhook for successful transaction: {e}")
 		
