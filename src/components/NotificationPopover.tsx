@@ -1,16 +1,18 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Bell } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export type Notification = {
   id: string;
   title: string;
   description: string;
-  timestamp: Date;
+  created_at: string;
   read: boolean;
 };
 
@@ -43,7 +45,7 @@ const NotificationItem = ({
         </h4>
       </div>
       <span className="text-xs text-muted-foreground dark:text-muted-foreground">
-        {notification.timestamp.toLocaleDateString()}
+        {new Date(notification.created_at).toLocaleDateString()}
       </span>
     </div>
     <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
@@ -78,57 +80,138 @@ interface NotificationPopoverProps {
   onNotificationsChange?: (notifications: Notification[]) => void;
 }
 
-const dummyNotifications: Notification[] = [
-  {
-    id: "1",
-    title: "New Message",
-    description: "You have received a new message from John Doe",
-    timestamp: new Date("2025-09-02"),
-    read: false,
-  },
-  {
-    id: "2",
-    title: "System Update",
-    description: "System maintenance scheduled for tomorrow",
-    timestamp: new Date("2025-09-01"),
-    read: false,
-  },
-  {
-    id: "3",
-    title: "Reminder",
-    description: "Meeting with team at 2 PM",
-    timestamp: new Date("2025-08-31"),
-    read: true,
-  },
-];
-
 export const NotificationPopover = ({
-  notifications: initialNotifications = dummyNotifications,
+  notifications: initialNotifications = [],
   onNotificationsChange,
 }: NotificationPopoverProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] =
-    useState<Notification[]>(initialNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  // Fetch notifications from database
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setLoading(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching notifications:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load notifications",
+            variant: "destructive",
+          });
+        } else {
+          setNotifications(data || []);
+          onNotificationsChange?.(data || []);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNotifications();
+
+    // Set up real-time subscription for new notifications
+    const channel = supabase
+      .channel('notifications-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+        },
+        () => {
+          fetchNotifications();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [onNotificationsChange, toast]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const toggleOpen = () => setIsOpen(!isOpen);
 
-  const markAllAsRead = () => {
-    const updatedNotifications = notifications.map((n) => ({
-      ...n,
-      read: true,
-    }));
-    setNotifications(updatedNotifications);
-    onNotificationsChange?.(updatedNotifications);
+  const markAllAsRead = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const unreadNotifications = notifications.filter(n => !n.read);
+      if (unreadNotifications.length === 0) return;
+
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('user_id', user.id)
+        .eq('read', false);
+
+      if (error) {
+        console.error('Error marking notifications as read:', error);
+        toast({
+          title: "Error",
+          description: "Failed to mark notifications as read",
+          variant: "destructive",
+        });
+      } else {
+        const updatedNotifications = notifications.map((n) => ({
+          ...n,
+          read: true,
+        }));
+        setNotifications(updatedNotifications);
+        onNotificationsChange?.(updatedNotifications);
+        toast({
+          title: "Success",
+          description: "All notifications marked as read",
+        });
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
   };
 
-  const markAsRead = (id: string) => {
-    const updatedNotifications = notifications.map((n) =>
-      n.id === id ? { ...n, read: true } : n
-    );
-    setNotifications(updatedNotifications);
-    onNotificationsChange?.(updatedNotifications);
+  const markAsRead = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error marking notification as read:', error);
+        toast({
+          title: "Error",
+          description: "Failed to mark notification as read",
+          variant: "destructive",
+        });
+      } else {
+        const updatedNotifications = notifications.map((n) =>
+          n.id === id ? { ...n, read: true } : n
+        );
+        setNotifications(updatedNotifications);
+        onNotificationsChange?.(updatedNotifications);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
   };
 
   return (
@@ -161,21 +244,34 @@ export const NotificationPopover = ({
               <h3 className="text-sm font-medium text-card-foreground dark:text-card-foreground">
                 Notifications
               </h3>
-              <Button
-                onClick={markAllAsRead}
-                variant="ghost"
-                size="sm"
-                className="text-xs hover:bg-accent dark:hover:bg-accent"
-                data-testid="mark-all-read"
-              >
-                Mark all as read
-              </Button>
+              {unreadCount > 0 && (
+                <Button
+                  onClick={markAllAsRead}
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs hover:bg-accent dark:hover:bg-accent"
+                  data-testid="mark-all-read"
+                >
+                  Mark all as read
+                </Button>
+              )}
             </div>
 
-            <NotificationList
-              notifications={notifications}
-              onMarkAsRead={markAsRead}
-            />
+            {loading ? (
+              <div className="p-4 text-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mx-auto"></div>
+                <p className="text-xs text-muted-foreground mt-2">Loading notifications...</p>
+              </div>
+            ) : notifications.length === 0 ? (
+              <div className="p-4 text-center">
+                <p className="text-sm text-muted-foreground">No notifications yet</p>
+              </div>
+            ) : (
+              <NotificationList
+                notifications={notifications}
+                onMarkAsRead={markAsRead}
+              />
+            )}
           </motion.div>
         )}
       </AnimatePresence>
