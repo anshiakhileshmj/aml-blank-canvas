@@ -3,9 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Flag, MoreHorizontal } from "lucide-react";
+import { Eye, Flag, MoreHorizontal, CheckCircle, XCircle, Clock } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 
 function getRiskColor(riskScore: number) {
@@ -35,17 +37,63 @@ export function AdvancedFiltering() {
 
   type Transaction = {
     id: string;
-    customerName: string;
-    transactionType: string;
-    amount: string;
-    riskScore: number;
+    user_id: string;
+    tx_hash?: string | null;
+    from_address: string;
+    to_address: string;
+    amount?: number | null;
+    currency?: string | null;
+    blockchain?: string | null;
     status: string;
-    createdAt?: string;
+    risk_score?: number | null;
+    risk_level?: string | null;
+    description?: string | null;
+    created_at: string | null;
+    geo_data?: any;
+    gas_price?: number | null;
   };
 
+  const { user } = useAuth();
   const { data: transactions = [], isLoading, error } = useQuery<Transaction[]>({
-    queryKey: ["/api/transactions", "filtered", { dateRange, riskLevel, country, transactionType }],
-    enabled: true,
+    queryKey: ["transactions", "filtered", { dateRange, riskLevel, country, transactionType }],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      let query = supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      // Apply filters
+      if (riskLevel !== "all-levels") {
+        const riskScore = transactions?.find(t => t.risk_score || 0)?.risk_score || 0;
+        switch (riskLevel) {
+          case "critical":
+            query = query.gte('risk_score', 90);
+            break;
+          case "high":
+            query = query.gte('risk_score', 70).lt('risk_score', 90);
+            break;
+          case "medium":
+            query = query.gte('risk_score', 40).lt('risk_score', 70);
+            break;
+          case "low":
+            query = query.lt('risk_score', 40);
+            break;
+        }
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching transactions:', error);
+        throw error;
+      }
+
+      return data || [];
+    },
+    enabled: !!user,
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -116,33 +164,32 @@ export function AdvancedFiltering() {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-card-foreground dark:text-card-foreground mb-2">Country</label>
+              <label className="block text-sm font-medium text-card-foreground dark:text-card-foreground mb-2">Blockchain</label>
               <Select value={country} onValueChange={setCountry}>
-                <SelectTrigger data-testid="country-filter">
+                <SelectTrigger data-testid="blockchain-filter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all-countries">All countries</SelectItem>
-                  <SelectItem value="united-states">United States</SelectItem>
-                  <SelectItem value="united-kingdom">United Kingdom</SelectItem>
-                  <SelectItem value="canada">Canada</SelectItem>
-                  <SelectItem value="high-risk">High-risk jurisdictions</SelectItem>
+                  <SelectItem value="all-countries">All blockchains</SelectItem>
+                  <SelectItem value="ethereum">Ethereum</SelectItem>
+                  <SelectItem value="polygon">Polygon</SelectItem>
+                  <SelectItem value="arbitrum">Arbitrum</SelectItem>
+                  <SelectItem value="bsc">BSC</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-card-foreground dark:text-card-foreground mb-2">Transaction Type</label>
+              <label className="block text-sm font-medium text-card-foreground dark:text-card-foreground mb-2">Status</label>
               <Select value={transactionType} onValueChange={setTransactionType}>
-                <SelectTrigger data-testid="transaction-type-filter">
+                <SelectTrigger data-testid="status-filter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all-types">All types</SelectItem>
-                  <SelectItem value="wire-transfers">Wire transfers</SelectItem>
-                  <SelectItem value="cash-deposits">Cash deposits</SelectItem>
-                  <SelectItem value="international">International transfers</SelectItem>
-                  <SelectItem value="cryptocurrency">Cryptocurrency</SelectItem>
+                  <SelectItem value="all-types">All statuses</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="blocked">Blocked</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -153,11 +200,12 @@ export function AdvancedFiltering() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50 dark:bg-muted/50">
-                  <TableHead className="text-card-foreground dark:text-card-foreground">Transaction ID</TableHead>
-                  <TableHead className="text-card-foreground dark:text-card-foreground">Customer</TableHead>
+                  <TableHead className="text-card-foreground dark:text-card-foreground">From → To</TableHead>
                   <TableHead className="text-card-foreground dark:text-card-foreground">Amount</TableHead>
+                  <TableHead className="text-card-foreground dark:text-card-foreground">Blockchain</TableHead>
                   <TableHead className="text-card-foreground dark:text-card-foreground">Risk Score</TableHead>
                   <TableHead className="text-card-foreground dark:text-card-foreground">Status</TableHead>
+                  <TableHead className="text-card-foreground dark:text-card-foreground">Location</TableHead>
                   <TableHead className="text-card-foreground dark:text-card-foreground">Date</TableHead>
                   <TableHead className="text-card-foreground dark:text-card-foreground">Actions</TableHead>
                 </TableRow>
@@ -170,60 +218,101 @@ export function AdvancedFiltering() {
                       className="hover:bg-muted/30 dark:hover:bg-muted/30 transition-colors"
                       data-testid={`filtered-transaction-${transaction.id}`}
                     >
-                      <TableCell className="font-mono text-xs">{transaction.id}</TableCell>
                       <TableCell>
-                        <div>
-                          <p className="font-medium text-card-foreground dark:text-card-foreground">{transaction.customerName}</p>
-                          <p className="text-xs text-muted-foreground dark:text-muted-foreground">
-                            {transaction.transactionType}
-                          </p>
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs text-muted-foreground">From:</span>
+                            <span className="font-mono text-xs truncate max-w-[120px]" title={transaction.from_address}>
+                              {transaction.from_address ? `${transaction.from_address.slice(0, 6)}...${transaction.from_address.slice(-4)}` : 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs text-muted-foreground">To:</span>
+                            <span className="font-mono text-xs truncate max-w-[120px]" title={transaction.to_address}>
+                              {transaction.to_address ? `${transaction.to_address.slice(0, 6)}...${transaction.to_address.slice(-4)}` : 'N/A'}
+                            </span>
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium">
-                        ${parseFloat(transaction.amount).toLocaleString()}
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="font-medium">
+                            {transaction.amount ? 
+                              `${parseFloat(transaction.amount.toString()).toFixed(4)} ${transaction.currency || 'ETH'}` : 
+                              'N/A'
+                            }
+                          </div>
+                          {transaction.tx_hash && (
+                            <div className="text-xs text-muted-foreground font-mono">
+                              {`${transaction.tx_hash.slice(0, 8)}...${transaction.tx_hash.slice(-6)}`}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="capitalize">
+                          {transaction.blockchain || 'ethereum'}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
-                          <span className={`font-medium ${getRiskColor(transaction.riskScore)}`}>
-                            {transaction.riskScore}
+                          <span className={`font-medium ${getRiskColor(transaction.risk_score || 0)}`}>
+                            {transaction.risk_score || 0}
                           </span>
                           <div className="w-12 bg-border dark:bg-border rounded-full h-2">
                             <div
                               className={`h-2 rounded-full ${
-                                transaction.riskScore >= 80 ? "bg-destructive" :
-                                transaction.riskScore >= 60 ? "bg-chart-3" : "bg-chart-2"
+                                (transaction.risk_score || 0) >= 80 ? "bg-destructive" :
+                                (transaction.risk_score || 0) >= 60 ? "bg-chart-3" : "bg-chart-2"
                               }`}
-                              style={{ width: `${transaction.riskScore}%` }}
+                              style={{ width: `${transaction.risk_score || 0}%` }}
                             ></div>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getStatusVariant(transaction.status)} className="capitalize">
-                          {transaction.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground dark:text-muted-foreground">
-                        {new Date(transaction.createdAt!).toLocaleDateString()}
+                        <div className="flex items-center space-x-2">
+                          {transaction.status === "completed" && <CheckCircle className="w-4 h-4 text-green-500" />}
+                          {transaction.status === "blocked" && <XCircle className="w-4 h-4 text-red-500" />}
+                          {transaction.status === "pending" && <Clock className="w-4 h-4 text-blue-500" />}
+                          <Badge variant={getStatusVariant(transaction.status)} className="capitalize">
+                            {transaction.status}
+                          </Badge>
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center space-x-2">
+                        <div className="text-xs">
+                          {transaction.geo_data?.country || 
+                           transaction.geo_data?.country_name || 
+                           'Unknown'}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground dark:text-muted-foreground text-xs">
+                        {transaction.created_at ? new Date(transaction.created_at).toLocaleDateString() : 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-1">
                           <Button variant="ghost" size="sm" className="p-1" data-testid={`view-transaction-${transaction.id}`}>
                             <Eye className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="p-1" data-testid={`flag-transaction-${transaction.id}`}>
-                            <Flag className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="p-1" data-testid={`more-actions-${transaction.id}`}>
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
+                          {transaction.tx_hash && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="p-1" 
+                              onClick={() => window.open(`https://etherscan.io/tx/${transaction.tx_hash}`, '_blank')}
+                              title="View on Etherscan"
+                            >
+                              <Flag className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       <p className="text-muted-foreground dark:text-muted-foreground">No transactions match the current filters</p>
                     </TableCell>
                   </TableRow>
