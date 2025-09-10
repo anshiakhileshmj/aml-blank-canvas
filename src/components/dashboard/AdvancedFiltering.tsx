@@ -55,7 +55,6 @@ export function AdvancedFiltering() {
       <Card className="bg-card dark:bg-card border-border dark:border-border">
         <CardHeader>
           <CardTitle className="text-card-foreground dark:text-card-foreground">Advanced Transaction Filtering</CardTitle>
-          <p className="text-sm text-muted-foreground dark:text-muted-foreground">Filter and search transactions by multiple criteria</p>
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
@@ -80,7 +79,6 @@ export function AdvancedFiltering() {
     <Card className="bg-card dark:bg-card border-border dark:border-border">
       <CardHeader>
         <CardTitle className="text-card-foreground dark:text-card-foreground">Advanced Transaction Filtering</CardTitle>
-        <p className="text-sm text-muted-foreground dark:text-muted-foreground">Filter and search transactions by multiple criteria</p>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
