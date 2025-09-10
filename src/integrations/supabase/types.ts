@@ -548,17 +548,25 @@ export type Database = {
         Row: {
           amount: number | null
           blockchain: string | null
+          client_ip: string | null
           created_at: string | null
           currency: string | null
           customer_id: string | null
           customer_name: string | null
           description: string | null
           from_address: string
+          gas_limit: number | null
+          gas_price: number | null
+          geo_data: Json | null
           id: string
+          idempotency_key: string | null
+          is_contract_interaction: boolean | null
+          raw_tx_data: string | null
           risk_level: string | null
           risk_score: number | null
           status: string
           to_address: string
+          transaction_size: number | null
           tx_hash: string | null
           updated_at: string | null
           user_id: string
@@ -566,17 +574,25 @@ export type Database = {
         Insert: {
           amount?: number | null
           blockchain?: string | null
+          client_ip?: string | null
           created_at?: string | null
           currency?: string | null
           customer_id?: string | null
           customer_name?: string | null
           description?: string | null
           from_address: string
+          gas_limit?: number | null
+          gas_price?: number | null
+          geo_data?: Json | null
           id?: string
+          idempotency_key?: string | null
+          is_contract_interaction?: boolean | null
+          raw_tx_data?: string | null
           risk_level?: string | null
           risk_score?: number | null
           status?: string
           to_address: string
+          transaction_size?: number | null
           tx_hash?: string | null
           updated_at?: string | null
           user_id: string
@@ -584,17 +600,25 @@ export type Database = {
         Update: {
           amount?: number | null
           blockchain?: string | null
+          client_ip?: string | null
           created_at?: string | null
           currency?: string | null
           customer_id?: string | null
           customer_name?: string | null
           description?: string | null
           from_address?: string
+          gas_limit?: number | null
+          gas_price?: number | null
+          geo_data?: Json | null
           id?: string
+          idempotency_key?: string | null
+          is_contract_interaction?: boolean | null
+          raw_tx_data?: string | null
           risk_level?: string | null
           risk_score?: number | null
           status?: string
           to_address?: string
+          transaction_size?: number | null
           tx_hash?: string | null
           updated_at?: string | null
           user_id?: string

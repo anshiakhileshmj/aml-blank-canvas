@@ -77,7 +77,7 @@ serve(async (req) => {
       );
     }
 
-    // Map relay transaction data to local transaction structure
+    // Map relay transaction data to local transaction structure with enhanced fields
     const mappedTransaction = {
       user_id: userId,
       from_address: transactionData.from_address,
@@ -91,7 +91,16 @@ serve(async (req) => {
       risk_score: transactionData.risk_score || 0,
       customer_name: transactionData.customer_name,
       customer_id: transactionData.customer_id,
-      description: transactionData.description || `Relay transaction via ${transactionData.partner_id || 'API'}`
+      description: transactionData.description || `Relay transaction via ${transactionData.partner_id || 'API'}`,
+      // Enhanced fields from relay API
+      client_ip: transactionData.client_ip || null,
+      geo_data: transactionData.geo_data || null,
+      raw_tx_data: transactionData.raw_tx_data || null,
+      gas_price: transactionData.gas_price || null,
+      gas_limit: transactionData.gas_limit || null,
+      transaction_size: transactionData.transaction_size || null,
+      is_contract_interaction: transactionData.is_contract_interaction || false,
+      idempotency_key: transactionData.idempotency_key || null
     };
 
     console.log('Mapped transaction:', mappedTransaction);

@@ -37,15 +37,25 @@ export interface Transaction {
   amount: string;
   currency: string;
   blockchain: string;
-  status: 'pending' | 'completed' | 'failed' | 'flagged';
+  status: 'pending' | 'completed' | 'failed' | 'flagged' | 'blocked';
   risk_score: number;
   risk_level: 'low' | 'medium' | 'high' | 'critical';
   is_sanctioned: boolean;
   customer_name?: string;
   customer_id?: string;
   description?: string;
+  tx_hash?: string;
   processed_at: string;
   created_at: string;
+  // Enhanced fields from relay API
+  client_ip?: string;
+  geo_data?: Record<string, any>;
+  raw_tx_data?: string;
+  gas_price?: string;
+  gas_limit?: string;
+  transaction_size?: number;
+  is_contract_interaction?: boolean;
+  idempotency_key?: string;
 }
 
 export interface Alert {
