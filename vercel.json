@@ -1,0 +1,20 @@
+{
+  "rewrites": [
+    {
+      "source": "/docs/:path*",
+      "destination": "https://mjak1524.apidog.io/:path*"
+    },
+    {
+      "source": "/docs",
+      "destination": "https://mjak1524.apidog.io"
+    },
+    {
+      "source": "/:path*.data",
+      "destination": "https://mjak1524.apidog.io/:path*.data"
+    },
+    {
+      "source": "/:path*",
+      "destination": "/index.html"
+    }
+  ]
+}
