@@ -116,6 +116,7 @@ export default function TransactionsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
+            <p className="text-muted-foreground">Monitor and analyze transaction flows</p>
           </div>
           <div className="flex items-center space-x-2">
             <Button variant="outline" size="sm" data-testid="button-export">
@@ -173,24 +174,27 @@ export default function TransactionsPage() {
           </Card>
         </div>
 
+        {/* Advanced Filtering */}
+        <AdvancedFiltering />
 
-        {/* Transaction History */}
+        {/* Transactions Table */}
         <Card>
           <CardHeader>
             <CardTitle>Transaction History</CardTitle>
+            <CardDescription>Recent transaction activity and risk assessments</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Sender/Receiver</TableHead>
-                  <TableHead>Native Amount</TableHead>
-                  <TableHead>Gas Price</TableHead>
+                  <TableHead>Transaction</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Blockchain</TableHead>
                   <TableHead>Risk Score</TableHead>
+                  <TableHead>Location</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Date</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Blockchain</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -200,32 +204,69 @@ export default function TransactionsPage() {
                       Loading transactions...
                     </TableCell>
                   </TableRow>
-                 ) : filteredTransactions.length === 0 ? (
-                   <TableRow>
-                     <TableCell colSpan={8} className="text-center py-8">
-                       No transactions found
-                     </TableCell>
-                   </TableRow>
+                ) : filteredTransactions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8">
+                      No transactions found
+                    </TableCell>
+                  </TableRow>
                 ) : (
                   filteredTransactions.map((transaction) => (
                     <TableRow key={transaction.id} data-testid={`transaction-${transaction.id}`}>
                       <TableCell>
-                        <div className="space-y-1">
-                          <div className="text-xs font-medium">To: {transaction.to_address}</div>
-                          <div className="text-xs text-muted-foreground">From: {transaction.from_address}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {transaction.amount ? `${transaction.amount.toLocaleString()} ${transaction.currency || 'ETH'}` : 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        {transaction.gas_price ? `${transaction.gas_price} Gwei` : 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getRiskScore(transaction.risk_score || 0)}>
-                          {transaction.risk_score || 0}/100
-                        </Badge>
-                      </TableCell>
+                        <div>
+                          <div className="font-medium text-xs">{transaction.to_address}</div>
+                          <div className="text-xs text-muted-foreground">
+                            From: {transaction.from_address}
+                          </div>
+                           {transaction.customer_name && (
+                             <div className="text-xs text-muted-foreground">
+                               Customer: {transaction.customer_name}
+                             </div>
+                           )}
+                           {transaction.is_contract_interaction && (
+                             <div className="text-xs text-blue-600">
+                               Contract Interaction
+                             </div>
+                           )}
+                         </div>
+                       </TableCell>
+                       <TableCell className="font-medium">
+                         {transaction.amount ? `${transaction.amount.toLocaleString()} ${transaction.currency || 'ETH'}` : 'N/A'}
+                       </TableCell>
+                       <TableCell>
+                         <Badge variant="outline">{transaction.blockchain || 'ethereum'}</Badge>
+                       </TableCell>
+                       <TableCell>
+                         <div className="flex flex-col space-y-1">
+                           <Badge variant={getRiskScore(transaction.risk_score || 0)}>
+                             {transaction.risk_score || 0}/100
+                           </Badge>
+                           {transaction.risk_level && (
+                             <Badge variant={getRiskBadgeColor(transaction.risk_level)} className="text-xs">
+                               {transaction.risk_level}
+                             </Badge>
+                           )}
+                         </div>
+                       </TableCell>
+                       <TableCell>
+                         <div className="flex flex-col">
+                           {transaction.geo_data && typeof transaction.geo_data === 'object' ? (
+                             <>
+                               <span className="text-sm font-medium">
+                                 {(transaction.geo_data as any)?.country || 'Unknown'}
+                               </span>
+                               {(transaction.geo_data as any)?.continent && (
+                                 <span className="text-xs text-muted-foreground">
+                                   {(transaction.geo_data as any)?.continent}
+                                 </span>
+                               )}
+                             </>
+                           ) : (
+                             <span className="text-sm text-muted-foreground">Unknown</span>
+                           )}
+                         </div>
+                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           {getStatusIcon(transaction.status)}
@@ -239,13 +280,9 @@ export default function TransactionsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm">
-                          {transaction.geo_data && typeof transaction.geo_data === 'object' ? 
-                            (transaction.geo_data as any)?.country || 'Unknown' : 'Unknown'}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{transaction.blockchain || 'ethereum'}</Badge>
+                        <Button variant="ghost" size="sm" data-testid={`button-view-${transaction.id}`}>
+                          <Eye className="w-4 h-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
