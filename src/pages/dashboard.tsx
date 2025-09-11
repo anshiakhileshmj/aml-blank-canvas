@@ -2,7 +2,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { MetricsCards } from "@/components/dashboard/MetricsCards";
 import { TransactionFeed } from "@/components/dashboard/TransactionFeed";
-import { AlertsPanel } from "@/components/dashboard/AlertsPanel";
+
 import { RiskAnalytics } from "@/components/dashboard/RiskAnalytics";
 import { RiskHeatmap } from "@/components/dashboard/RiskHeatmap";
 import { AdvancedFiltering } from "@/components/dashboard/AdvancedFiltering";
@@ -87,14 +87,8 @@ export default function Dashboard() {
           {/* Key Metrics Cards */}
           <MetricsCards />
 
-          {/* Main Dashboard Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Real-time Transaction Feed */}
-            <TransactionFeed />
-
-            {/* Alerts Panel */}
-            <AlertsPanel />
-          </div>
+          {/* Real-time Transaction Feed */}
+          <TransactionFeed />
 
           {/* Risk Analytics and Heatmap */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
