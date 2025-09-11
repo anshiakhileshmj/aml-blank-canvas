@@ -200,14 +200,14 @@ export function AdvancedFiltering() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50 dark:bg-muted/50">
-                  <TableHead className="text-card-foreground dark:text-card-foreground">From → To</TableHead>
+                  <TableHead className="text-card-foreground dark:text-card-foreground">From</TableHead>
+                  <TableHead className="text-card-foreground dark:text-card-foreground">To</TableHead>
                   <TableHead className="text-card-foreground dark:text-card-foreground">Amount</TableHead>
                   <TableHead className="text-card-foreground dark:text-card-foreground">Blockchain</TableHead>
                   <TableHead className="text-card-foreground dark:text-card-foreground">Risk Score</TableHead>
                   <TableHead className="text-card-foreground dark:text-card-foreground">Status</TableHead>
                   <TableHead className="text-card-foreground dark:text-card-foreground">Location</TableHead>
                   <TableHead className="text-card-foreground dark:text-card-foreground">Date</TableHead>
-                  <TableHead className="text-card-foreground dark:text-card-foreground">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -219,20 +219,14 @@ export function AdvancedFiltering() {
                       data-testid={`filtered-transaction-${transaction.id}`}
                     >
                       <TableCell>
-                        <div className="space-y-1">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xs text-muted-foreground">From:</span>
-                            <span className="font-mono text-xs truncate max-w-[120px]" title={transaction.from_address}>
-                              {transaction.from_address ? `${transaction.from_address.slice(0, 6)}...${transaction.from_address.slice(-4)}` : 'N/A'}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xs text-muted-foreground">To:</span>
-                            <span className="font-mono text-xs truncate max-w-[120px]" title={transaction.to_address}>
-                              {transaction.to_address ? `${transaction.to_address.slice(0, 6)}...${transaction.to_address.slice(-4)}` : 'N/A'}
-                            </span>
-                          </div>
-                        </div>
+                        <span className="font-mono text-xs truncate max-w-[120px]" title={transaction.from_address}>
+                          {transaction.from_address ? `${transaction.from_address.slice(0, 6)}...${transaction.from_address.slice(-4)}` : 'N/A'}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-mono text-xs truncate max-w-[120px]" title={transaction.to_address}>
+                          {transaction.to_address ? `${transaction.to_address.slice(0, 6)}...${transaction.to_address.slice(-4)}` : 'N/A'}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
@@ -290,29 +284,11 @@ export function AdvancedFiltering() {
                       <TableCell className="text-muted-foreground dark:text-muted-foreground text-xs">
                         {transaction.created_at ? new Date(transaction.created_at).toLocaleDateString() : 'N/A'}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-1">
-                          <Button variant="ghost" size="sm" className="p-1" data-testid={`view-transaction-${transaction.id}`}>
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          {transaction.tx_hash && (
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="p-1" 
-                              onClick={() => window.open(`https://etherscan.io/tx/${transaction.tx_hash}`, '_blank')}
-                              title="View on Etherscan"
-                            >
-                              <Flag className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
+                    <TableCell colSpan={7} className="text-center py-8">
                       <p className="text-muted-foreground dark:text-muted-foreground">No transactions match the current filters</p>
                     </TableCell>
                   </TableRow>

@@ -12,7 +12,6 @@ import { AdvancedFiltering } from "@/components/dashboard/AdvancedFiltering";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
-
 const getRiskBadgeColor = (level: string) => {
   switch (level) {
     case "critical": return "destructive";
@@ -61,6 +60,8 @@ export default function TransactionsPage() {
     description?: string | null;
     created_at: string | null;
     updated_at: string | null;
+    geo_data?: any;
+    gas_price?: number | null;
   };
 
   const { user } = useAuth();
@@ -109,6 +110,57 @@ export default function TransactionsPage() {
   const totalAmount = filteredTransactions.reduce((sum: number, tx: Transaction) => sum + (tx.amount || 0), 0);
   const flaggedCount = filteredTransactions.filter((tx: Transaction) => tx.status === "flagged").length;
 
+  const handleExportCSV = () => {
+    if (!filteredTransactions.length) return;
+    
+    const headers = [
+      'From Address',
+      'To Address', 
+      'Amount',
+      'Currency',
+      'Blockchain',
+      'Risk Score',
+      'Status',
+      'Location',
+      'Date',
+      'TX Hash',
+      'Gas Price'
+    ];
+    
+    const csvData = filteredTransactions.map(tx => [
+      tx.from_address || '',
+      tx.to_address || '',
+      tx.amount || 0,
+      tx.currency || 'ETH',
+      tx.blockchain || 'ethereum',
+      tx.risk_score || 0,
+      tx.status || '',
+      typeof tx.geo_data === 'object' && tx.geo_data && 'country' in tx.geo_data 
+        ? (tx.geo_data as any).country
+        : typeof tx.geo_data === 'object' && tx.geo_data && 'country_name' in tx.geo_data
+        ? (tx.geo_data as any).country_name
+        : 'Unknown',
+      tx.created_at ? new Date(tx.created_at).toLocaleDateString() : '',
+      tx.tx_hash || '',
+      tx.gas_price || ''
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.map(field => `"${field}"`).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `transactions-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -118,7 +170,7 @@ export default function TransactionsPage() {
             <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
           </div>
           <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" data-testid="button-export">
+            <Button variant="outline" size="sm" data-testid="button-export" onClick={handleExportCSV}>
               <Download className="w-4 h-4 mr-2" />
               Export
             </Button>
