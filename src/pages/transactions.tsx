@@ -62,6 +62,9 @@ export default function TransactionsPage() {
     updated_at: string | null;
     geo_data?: any;
     gas_price?: number | null;
+    gas_limit?: number | null;
+    transaction_size?: number | null;
+    is_contract_interaction?: boolean | null;
   };
 
   const { user } = useAuth();
@@ -124,10 +127,15 @@ export default function TransactionsPage() {
       'Location',
       'Date',
       'TX Hash',
-      'Gas Price'
+      'Gas Price',
+      'Gas Limit',
+      'Transaction Size',
+      'Contract Interaction',
+      'Customer Name',
+      'Customer ID'
     ];
     
-    const csvData = filteredTransactions.map(tx => [
+        const csvData = filteredTransactions.map(tx => [
       tx.from_address || '',
       tx.to_address || '',
       tx.amount || 0,
@@ -142,7 +150,12 @@ export default function TransactionsPage() {
         : 'Unknown',
       tx.created_at ? new Date(tx.created_at).toLocaleDateString() : '',
       tx.tx_hash || '',
-      tx.gas_price || ''
+      tx.gas_price || '',
+      tx.gas_limit || '',
+      tx.transaction_size || '',
+      tx.is_contract_interaction ? 'Yes' : 'No',
+      tx.customer_name || '',
+      tx.customer_id || ''
     ]);
     
     const csvContent = [
@@ -227,6 +240,131 @@ export default function TransactionsPage() {
 
         {/* Advanced Filtering */}
         <AdvancedFiltering />
+
+        {/* Transactions Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Transaction Details</CardTitle>
+            <CardDescription>
+              Complete transaction history with security analysis
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-sm text-muted-foreground">Loading transactions...</div>
+              </div>
+            ) : error ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-sm text-red-600">Error loading transactions</div>
+              </div>
+            ) : filteredTransactions.length === 0 ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-sm text-muted-foreground">No transactions found</div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Status</TableHead>
+                      <TableHead>From</TableHead>
+                      <TableHead>To</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Risk</TableHead>
+                      <TableHead>Gas Price</TableHead>
+                      <TableHead>Gas Limit</TableHead>
+                      <TableHead>Size</TableHead>
+                      <TableHead>Contract</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredTransactions.map((transaction: Transaction) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            {getStatusIcon(transaction.status)}
+                            <Badge variant={transaction.status === "flagged" ? "destructive" : "default"}>
+                              {transaction.status}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                            {transaction.from_address?.slice(0, 10)}...
+                          </code>
+                        </TableCell>
+                        <TableCell>
+                          <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                            {transaction.to_address?.slice(0, 10)}...
+                          </code>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-mono text-sm">
+                            {transaction.amount ? `${transaction.amount} ${transaction.currency || 'ETH'}` : '-'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getRiskScore(transaction.risk_score || 0)}>
+                            {transaction.risk_score || 0}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {transaction.gas_price ? `${transaction.gas_price} gwei` : '-'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {transaction.gas_limit || '-'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {transaction.transaction_size ? `${transaction.transaction_size} bytes` : '-'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={transaction.is_contract_interaction ? "secondary" : "outline"}>
+                            {transaction.is_contract_interaction ? "Yes" : "No"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {transaction.customer_name || transaction.customer_id || '-'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {typeof transaction.geo_data === 'object' && transaction.geo_data && 'country' in transaction.geo_data 
+                              ? (transaction.geo_data as any).country
+                              : typeof transaction.geo_data === 'object' && transaction.geo_data && 'country_name' in transaction.geo_data
+                              ? (transaction.geo_data as any).country_name
+                              : 'Unknown'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {transaction.created_at ? new Date(transaction.created_at).toLocaleDateString() : '-'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="outline" size="sm">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
       </div>
     </Layout>
