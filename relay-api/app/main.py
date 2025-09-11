@@ -349,6 +349,44 @@ def _decode_native_and_token_amounts(raw_tx_hex: str, chain: str) -> tuple[Optio
 
 	return amount, currency
 
+def _extract_tx_from_and_gas(raw_tx_hex: str) -> tuple[Optional[str], Optional[int], Optional[int]]:
+	"""Extract from_address, gas_limit, and gas_price_wei (best-effort) from raw tx.
+
+	Returns (from_address, gas_limit, gas_price_wei).
+	"""
+	from_address: Optional[str] = None
+	gas_limit: Optional[int] = None
+	gas_price_wei: Optional[int] = None
+
+	decoded = None
+	# Try legacy first
+	try:
+		from eth_account._utils.legacy_transactions import decode_transaction as decode_legacy
+		decoded = decode_legacy(raw_tx_hex)
+	except Exception:
+		decoded = None
+	# Fallback to typed/EIP-1559
+	if decoded is None:
+		try:
+			from eth_account._utils.typed_transactions import decode_transaction as decode_typed
+			decoded = decode_typed(raw_tx_hex)
+		except Exception:
+			decoded = None
+
+	try:
+		if decoded:
+			from_address = decoded.get("from") or decoded.get("sender")
+			gas_limit = decoded.get("gas") or decoded.get("gasLimit")
+			gp = decoded.get("gasPrice")
+			if gp is None:
+				gp = decoded.get("maxFeePerGas") or decoded.get("max_fee_per_gas")
+			if gp is not None:
+				gas_price_wei = int(gp)
+	except Exception:
+		pass
+
+	return from_address, gas_limit, gas_price_wei
+
 def get_w3(chain: str) -> Web3:
 	key = chain.lower()
 	if key not in w3_clients:
@@ -738,6 +776,13 @@ async def v1_relay(body: RelayRequest, request: Request, partner_and_key: tuple[
 
 	# Extract amounts (native or ERC-20) best-effort
 	amount_value, amount_currency = _decode_native_and_token_amounts(body.rawTx, chain_normalized)
+	from_address, gas_limit, gas_price_wei = _extract_tx_from_and_gas(body.rawTx)
+	gas_price_gwei: Optional[float] = None
+	try:
+		if gas_price_wei is not None:
+			gas_price_gwei = float(Web3.from_wei(int(gas_price_wei), "gwei"))
+	except Exception:
+		gas_price_gwei = None
 	
 	# Check sanctions first and log clearly
 	is_sanctioned = sanctions_checker.is_sanctioned(to)
@@ -775,7 +820,7 @@ async def v1_relay(body: RelayRequest, request: Request, partner_and_key: tuple[
 		# Send blocked transaction data to webhook
 		webhook_data = {
 			"partner_id": partner_id,
-			"from_address": None,
+			"from_address": from_address,
 			"to_address": to,
 			"amount": amount_value or 0,
 			"currency": amount_currency or "ETH",
@@ -786,7 +831,13 @@ async def v1_relay(body: RelayRequest, request: Request, partner_and_key: tuple[
 			"risk_score": decision.risk_score,
 			"description": f"Transaction blocked: {', '.join(reasons or decision.reasons)}",
 			"client_ip": client_ip,
-			"geo_data": geo_data
+			"geo_data": geo_data,
+			"gas_price": gas_price_gwei,
+			"gas_limit": gas_limit,
+			"transaction_size": (transaction_context or {}).get("data_size"),
+			"is_contract_interaction": (transaction_context or {}).get("is_contract", False),
+			"idempotency_key": body.idempotencyKey,
+			"raw_tx_data": body.rawTx
 		}
 		
 		# Call webhook (non-blocking)
@@ -834,7 +885,7 @@ async def v1_relay(body: RelayRequest, request: Request, partner_and_key: tuple[
 		# Send successful transaction data to webhook
 		webhook_data = {
 			"partner_id": partner_id,
-			"from_address": None,
+			"from_address": from_address,
 			"to_address": to,
 			"amount": amount_value or 0,
 			"currency": amount_currency or "ETH",
@@ -845,7 +896,13 @@ async def v1_relay(body: RelayRequest, request: Request, partner_and_key: tuple[
 			"risk_score": decision.risk_score,
 			"description": f"Transaction completed successfully via relay API",
 			"client_ip": client_ip,
-			"geo_data": geo_data
+			"geo_data": geo_data,
+			"gas_price": gas_price_gwei,
+			"gas_limit": gas_limit,
+			"transaction_size": (transaction_context or {}).get("data_size"),
+			"is_contract_interaction": (transaction_context or {}).get("is_contract", False),
+			"idempotency_key": body.idempotencyKey,
+			"raw_tx_data": body.rawTx
 		}
 		
 		# Call webhook (non-blocking)
