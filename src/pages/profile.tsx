@@ -222,113 +222,9 @@ export default function ProfilePage() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Profile Overview */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <User className="w-5 h-5 mr-2" />
-                  Profile Overview
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-col items-center space-y-4">
-                  <div className="relative">
-                    <Avatar className="w-24 h-24">
-                      <AvatarImage src="" alt={profile.fullName} />
-                      <AvatarFallback className="text-lg">
-                        {getInitials(profile.fullName)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="absolute -bottom-2 -right-2 rounded-full w-8 h-8 p-0"
-                      onClick={handleAvatarUpload}
-                      data-testid="button-upload-avatar"
-                    >
-                      <Camera className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <div className="text-center">
-                    <h3 className="font-semibold text-lg">{profile.fullName}</h3>
-                    <p className="text-muted-foreground">{profile.jobTitle}</p>
-                    <p className="text-sm text-muted-foreground">{profile.company}</p>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Mail className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">{profile.email}</span>
-                    {profile.emailVerified && (
-                      <Badge variant="outline" className="text-xs">Verified</Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Phone className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">{profile.phone}</span>
-                    {!profile.phoneVerified && (
-                      <Badge variant="secondary" className="text-xs">Unverified</Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <MapPin className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">{profile.location}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">Joined {new Date(profile.joinedDate).toLocaleDateString()}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Security Status */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Shield className="w-5 h-5 mr-2" />
-                  Security Status
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Two-Factor Auth</span>
-                  <Badge variant={profile.twoFactorEnabled ? "default" : "secondary"}>
-                    {profile.twoFactorEnabled ? "Enabled" : "Disabled"}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Email Verified</span>
-                  <Badge variant={profile.emailVerified ? "default" : "secondary"}>
-                    {profile.emailVerified ? "Verified" : "Pending"}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Phone Verified</span>
-                  <Badge variant={profile.phoneVerified ? "default" : "secondary"}>
-                    {profile.phoneVerified ? "Verified" : "Pending"}
-                  </Badge>
-                </div>
-                <div className="pt-2">
-                  <Button variant="outline" size="sm" className="w-full" data-testid="button-security-settings">
-                    <Key className="w-4 h-4 mr-2" />
-                    Security Settings
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-          </div>
-
-          {/* Profile Form */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Personal Information */}
-            <Card>
+        <div className="space-y-6">
+          {/* Personal Information */}
+          <Card>
               <CardHeader>
                 <CardTitle>Personal Information</CardTitle>
               </CardHeader>
@@ -488,7 +384,6 @@ export default function ProfilePage() {
                 </div>
               </CardContent>
             </Card>
-          </div>
         </div>
       </div>
     </Layout>
