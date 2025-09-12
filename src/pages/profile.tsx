@@ -12,12 +12,14 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Layout } from "@/components/layout/Layout";
 import { useToast } from "@/hooks/use-toast";
+import { DeleteAccountDialog } from "@/components/DeleteAccountDialog";
 
 export default function ProfilePage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [profile, setProfile] = useState({
     fullName: "",
     email: "",
@@ -378,7 +380,12 @@ export default function ProfilePage() {
                     <Phone className="w-4 h-4 mr-2" />
                     Verify Phone
                   </Button>
-                  <Button variant="outline" className="text-red-600 hover:text-red-700" data-testid="button-delete-account">
+                  <Button 
+                    variant="outline" 
+                    className="text-red-600 hover:text-red-700" 
+                    data-testid="button-delete-account"
+                    onClick={() => setDeleteDialogOpen(true)}
+                  >
                     Delete Account
                   </Button>
                 </div>
@@ -386,6 +393,11 @@ export default function ProfilePage() {
             </Card>
         </div>
       </div>
+
+      <DeleteAccountDialog 
+        open={deleteDialogOpen} 
+        onOpenChange={setDeleteDialogOpen} 
+      />
     </Layout>
   );
 }
