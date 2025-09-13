@@ -1,30 +1,50 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { LatLngExpression } from 'leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip } from 'react-leaflet';
+import { supabase } from "@/integrations/supabase/client";
+import 'leaflet/dist/leaflet.css';
 
 interface GeographicRiskData {
+  id: string;
   country: string;
-  riskScore: number;
-  latitude: number;
-  longitude: number;
-  transactionCount: number;
+  region: string | null;
+  city: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  risk_score_avg: number;
+  total_transactions: number;
+  blocked_transactions: number;
+  allowed_transactions: number;
 }
 
 export function RiskHeatmap() {
-  const mapRef = useRef<HTMLDivElement>(null);
   const { data: geoData, isLoading } = useQuery<GeographicRiskData[]>({
-    queryKey: ["/api/analytics", "geographic-risk"],
-    enabled: true,
+    queryKey: ["geographic-risk-data"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('geographic_risk_data')
+        .select('*')
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    refetchInterval: 30000, // Refetch every 30 seconds
   });
 
-  useEffect(() => {
-    // In a real implementation, you would initialize React Leaflet here
-    // For now, we'll show a placeholder
-    if (mapRef.current && !isLoading) {
-      // Initialize map with React Leaflet
-      console.log("Initialize React Leaflet map with geographic risk data", geoData);
-    }
-  }, [geoData, isLoading]);
+  const getMarkerColor = (riskScore: number) => {
+    if (riskScore >= 70) return '#ef4444'; // High risk - red
+    if (riskScore >= 40) return '#f97316'; // Medium risk - orange  
+    return '#22c55e'; // Low risk - green
+  };
+
+  const getMarkerSize = (totalTransactions: number) => {
+    if (totalTransactions > 100) return 12;
+    if (totalTransactions > 20) return 8;
+    return 5;
+  };
 
   if (isLoading) {
     return (
@@ -53,36 +73,75 @@ export function RiskHeatmap() {
         <p className="text-sm text-muted-foreground dark:text-muted-foreground">High-risk regions and transaction volumes</p>
       </CardHeader>
       <CardContent>
-        <div 
-          ref={mapRef} 
-          className="h-64 bg-muted/20 dark:bg-muted/20 rounded-lg border border-border dark:border-border relative overflow-hidden"
-          data-testid="risk-heatmap"
-        >
-          {/* Placeholder for React Leaflet map */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center">
-              <svg className="w-16 h-16 text-muted-foreground dark:text-muted-foreground mx-auto mb-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zM12 11.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-              </svg>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">World Risk Heatmap</p>
-              <p className="text-xs text-muted-foreground dark:text-muted-foreground">React Leaflet integration ready</p>
-            </div>
-          </div>
+        <div className="h-64 relative rounded-lg overflow-hidden border border-border dark:border-border">
+          <MapContainer
+            center={[20, 0] as LatLngExpression}
+            zoom={2}
+            style={{ height: '100%', width: '100%' }}
+            zoomControl={false}
+            scrollWheelZoom={false}
+          >
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            
+            {geoData?.map((location) => {
+              if (!location.latitude || !location.longitude) return null;
+              
+              return (
+                <CircleMarker
+                  key={location.id}
+                  center={[location.latitude, location.longitude] as LatLngExpression}
+                  radius={getMarkerSize(location.total_transactions)}
+                  pathOptions={{
+                    fillColor: getMarkerColor(location.risk_score_avg),
+                    color: "#fff",
+                    weight: 1,
+                    opacity: 0.8,
+                    fillOpacity: 0.7
+                  }}
+                >
+                  <Popup>
+                    <div className="p-2">
+                      <h3 className="font-semibold text-sm">
+                        {location.city ? `${location.city}, ` : ''}
+                        {location.region ? `${location.region}, ` : ''}
+                        {location.country}
+                      </h3>
+                      <div className="text-xs space-y-1">
+                        <p>Risk Score: <span className="font-medium">{location.risk_score_avg.toFixed(1)}</span></p>
+                        <p>Total Transactions: <span className="font-medium">{location.total_transactions}</span></p>
+                        <p>Blocked: <span className="font-medium text-red-600">{location.blocked_transactions}</span></p>
+                        <p>Allowed: <span className="font-medium text-green-600">{location.allowed_transactions}</span></p>
+                      </div>
+                    </div>
+                  </Popup>
+                  <Tooltip>
+                    <div className="text-xs">
+                      <strong>{location.country}</strong><br/>
+                      Risk: {location.risk_score_avg.toFixed(1)}<br/>
+                      Transactions: {location.total_transactions}
+                    </div>
+                  </Tooltip>
+                </CircleMarker>
+              );
+            })}
+          </MapContainer>
           
           {/* Risk level indicators */}
-          <div className="absolute top-4 right-4 bg-card/90 dark:bg-card/90 backdrop-blur-sm rounded-lg p-3 border border-border dark:border-border">
+          <div className="absolute top-4 right-4 bg-card/90 dark:bg-card/90 backdrop-blur-sm rounded-lg p-3 border border-border dark:border-border z-[1000]">
             <div className="space-y-2">
               <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-destructive dark:bg-destructive rounded"></div>
-                <span className="text-xs text-card-foreground dark:text-card-foreground">High Risk</span>
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#ef4444' }}></div>
+                <span className="text-xs text-card-foreground dark:text-card-foreground">High Risk (70+)</span>
               </div>
               <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-chart-3 dark:bg-chart-3 rounded"></div>
-                <span className="text-xs text-card-foreground dark:text-card-foreground">Medium Risk</span>
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#f97316' }}></div>
+                <span className="text-xs text-card-foreground dark:text-card-foreground">Medium Risk (40-69)</span>
               </div>
               <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-chart-2 dark:bg-chart-2 rounded"></div>
-                <span className="text-xs text-card-foreground dark:text-card-foreground">Low Risk</span>
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#22c55e' }}></div>
+                <span className="text-xs text-card-foreground dark:text-card-foreground">Low Risk (&lt;40)</span>
               </div>
             </div>
           </div>
