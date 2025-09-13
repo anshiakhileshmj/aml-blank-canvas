@@ -196,6 +196,51 @@ export type Database = {
         }
         Relationships: []
       }
+      geographic_risk_data: {
+        Row: {
+          allowed_transactions: number
+          blocked_transactions: number
+          city: string | null
+          country: string
+          created_at: string
+          id: string
+          last_updated: string
+          latitude: number | null
+          longitude: number | null
+          region: string | null
+          risk_score_avg: number
+          total_transactions: number
+        }
+        Insert: {
+          allowed_transactions?: number
+          blocked_transactions?: number
+          city?: string | null
+          country: string
+          created_at?: string
+          id?: string
+          last_updated?: string
+          latitude?: number | null
+          longitude?: number | null
+          region?: string | null
+          risk_score_avg?: number
+          total_transactions?: number
+        }
+        Update: {
+          allowed_transactions?: number
+          blocked_transactions?: number
+          city?: string | null
+          country?: string
+          created_at?: string
+          id?: string
+          last_updated?: string
+          latitude?: number | null
+          longitude?: number | null
+          region?: string | null
+          risk_score_avg?: number
+          total_transactions?: number
+        }
+        Relationships: []
+      }
       notification_settings: {
         Row: {
           alert_types: string[] | null
